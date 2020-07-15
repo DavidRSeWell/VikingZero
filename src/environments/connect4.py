@@ -8,21 +8,23 @@ class Connect4(gym.Env):
 
     metadata = {'render.modes': ['human']}
 
-    def __init__(self):
+    def __init__(self,display_board=False):
+
+        self._display_board = display_board
+
         self.board = np.zeros((6,7))
         self.current_player = 1
 
     def close(self):
         self.close()
 
-    def compute_action(self,action):
-        '''
-        :param action: int column number of action
-        :return:
-        '''
-
     def process_move(self,board,action):
-
+        """
+        Compute row of action that user took
+        :param board:
+        :param action:
+        :return:
+        """
         legal_play = np.where(board[:, action] == 0)[0]
 
         if len(legal_play) == 0:
@@ -47,9 +49,17 @@ class Connect4(gym.Env):
 
         board_row = self.process_move(curr_state,action)
 
-        new_state = curr_state[board_row,action] = self.current_player
+        next_state = curr_state.copy()
 
-        winner = self.check_winner(new_state)
+        next_state[board_row, action] = self.current_player
+
+        winner = self.check_winner(next_state)
+
+        self.board = next_state
+
+        self.current_player *= -1
+
+        return curr_state,action,next_state,winner
 
     @staticmethod
     def check_diagnol(board):
@@ -154,14 +164,19 @@ class Connect4(gym.Env):
         # no winners
         return 0
 
-
-
-
-
-
+    @staticmethod
+    def valid_actions(s: np.array) -> np.array:
+        """
+        :param s: numpy array of the state
+        :return: numpy array representing the set of valid actions
+        """
+        return np.where(s[0,:] == 0)[0]
 
 if __name__ == '__main__':
 
-  env = gym.Env()
+    env = Connect4(display_board=True)
 
-  print('Done running connect4')
+    env.step(4)
+    env.step(4)
+
+    print('Done running connect4')

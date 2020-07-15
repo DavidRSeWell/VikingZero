@@ -236,3 +236,59 @@ def test_connect_4_winner():
     winner = env.check_winner(board)
 
     assert winner == 1
+
+def test_connect_4_valid_actions():
+
+    env = Connect4()
+
+    # CASE 0: Nobody has played
+    board = np.array([
+        [0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0],
+
+    ])
+
+    valid_actions = env.valid_actions(board)
+
+    assert len(valid_actions) == 7
+
+    # CASE 1: First Column gone
+    board = np.array([
+        [1, 0, 0, 0, 0, 0, 0],
+        [1, 0, 0, 0, 0, 0, 0],
+        [1, 0, 0, 0, 0, 0, 0],
+        [1, 0, 0, 0, 0, 0, 0],
+        [1, 0, 0, 0, 0, 0, 0],
+        [1, 0, 0, 0, 0, 0, 0],
+
+    ])
+
+    valid_actions = env.valid_actions(board)
+
+    assert len(valid_actions) == 6
+
+    # CASE 3: None
+    board = np.array([
+        [1, 1, 1, 1, 1, 1, 1],
+        [1, 1, 1, 1, 1, 1, 1],
+        [1, 1, 1, 1, 1, 1, 1],
+        [1, 1, 1, 1, 1, 1, 1],
+        [1, 1, 1, 1, 1, 1, 1],
+        [1, 1, 1, 1, 1, 1, 1],
+
+    ])
+
+    valid_actions = env.valid_actions(board)
+
+    assert len(valid_actions) == 0
+
+
+
+if __name__ == '__main__':
+
+    test_connect_4_valid_actions()
+
