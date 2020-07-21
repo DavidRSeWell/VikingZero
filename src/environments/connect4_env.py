@@ -1,9 +1,6 @@
 import numpy as np
 import gym
 
-from gym import error, spaces, utils
-from gym.utils import seeding
-
 class Connect4(gym.Env):
 
     metadata = {'render.modes': ['human']}
@@ -159,7 +156,7 @@ class Connect4(gym.Env):
 
         if len(num_zeros[0]) == 0:
             # we have played to this point without a winner and board is full
-            return -1
+            return 2
 
         # no winners
         return 0

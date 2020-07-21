@@ -1,6 +1,6 @@
 import numpy as np
 
-from src.environments.connect4 import Connect4
+from src.environments.connect4_env import Connect4
 
 def test_connect_4_board():
     '''

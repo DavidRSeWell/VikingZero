@@ -1,6 +1,8 @@
 
-from src.agents.connect4 import RandomConnect4Agent
-from src.environments.connect4 import Connect4
+from src.agents.connect4_agent import RandomConnect4Agent
+from src.designer.connect4_designer import Connect4Designer
+from src.environments.connect4_env import Connect4
+
 
 def test_random_agent():
 
@@ -27,11 +29,33 @@ def test_random_agent():
 
         curr_player = agent2
 
+    assert winner in [-1,0,1,2]
+
+
+def test_designer():
+
+    env = Connect4()
+
+    agent1_config = {
+        'agent': RandomConnect4Agent
+    }
+
+    agent2_config = {
+        'agent': RandomConnect4Agent
+    }
+
+    designer = Connect4Designer(iters=1000,env=env
+                                ,agent1_config=agent1_config
+                                ,agent2_config=agent2_config
+                                )
+
+    designer.run()
+
 
 
 if __name__ == "__main__":
 
-    test_random_agent()
+    test_designer()
 
 
 
