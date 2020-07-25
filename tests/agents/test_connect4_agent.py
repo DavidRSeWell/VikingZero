@@ -1,7 +1,6 @@
-
-from src.agents.connect4_agent import RandomConnect4Agent
-from src.designer.connect4_designer import Connect4Designer
-from src.environments.connect4_env import Connect4
+from vikingzero.agents.connect4_agent import RandomConnect4Agent
+from vikingzero.designers.connect4_designer import Connect4Designer
+from vikingzero.environments.connect4_env import Connect4
 
 
 def test_random_agent():

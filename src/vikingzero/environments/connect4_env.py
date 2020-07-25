@@ -122,6 +122,8 @@ class Connect4(gym.Env):
         :return:
         '''
 
+        #TODO I threw up in my mouth a little when I saw all these if statements I wrote
+
         # check horizontal
         c = Connect4.check_horizontal(board)
 

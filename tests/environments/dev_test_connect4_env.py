@@ -1,6 +1,6 @@
 import numpy as np
 
-from src.environments.connect4_env import Connect4
+from vikingzero.environments.connect4_env import Connect4
 
 def dev_connect_4_render():
 

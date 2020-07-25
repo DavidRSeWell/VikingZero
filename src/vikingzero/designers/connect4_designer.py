@@ -1,7 +1,7 @@
 from sacred import Experiment
 
-from agents.connect4_agent import RandomConnect4Agent
-from environments.connect4_env import Connect4
+from ..agents.connect4_agent import RandomConnect4Agent
+from ..environments.connect4_env import Connect4
 
 ex = Experiment('Connect4_Experiment')
 
