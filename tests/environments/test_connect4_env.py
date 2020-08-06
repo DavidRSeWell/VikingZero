@@ -237,6 +237,21 @@ def test_connect_4_winner():
 
     assert winner == 1
 
+    # CASE: Draw
+    board = np.array([
+        [1, 1, 2, 1, 2, 1, 2],
+        [2, 1, 2, 1, 1, 2, 1],
+        [1, 1, 2, 2, 2, 1, 1],
+        [2, 2, 1, 1, 1, 2, 2],
+        [1, 2, 1, 2, 2, 1, 2],
+        [2, 1, 1, 2, 1, 2, 1],
+
+    ])
+
+    winner = env.check_winner(board)
+
+    assert winner == -1
+
 def test_connect_4_valid_actions():
 
     env = Connect4()

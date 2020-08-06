@@ -1,7 +1,14 @@
+import numpy as np
+
 from sacred import Experiment
 
-from ..agents.connect4_agent import RandomConnect4Agent
-from ..environments.connect4_env import Connect4
+
+try:
+    from ..agents.connect4_agent import RandomConnect4Agent, Connect4MCTS
+    from ..environments.connect4_env import Connect4
+except:
+    from vikingzero.agents.connect4_agent import RandomConnect4Agent, Connect4MCTS
+    from vikingzero.environments.connect4_env import Connect4
 
 ex = Experiment('Connect4_Experiment')
 
@@ -11,10 +18,13 @@ def connect4_config():
 
     env = Connect4()
 
-    iters = 100
+    iters = 500
 
     agent1_config = {
-        'agent': RandomConnect4Agent
+        'agent': Connect4MCTS,
+        'n_sim': 50,
+        'c': np.sqrt(2),
+        'player': 1
     }
 
     agent2_config = {
@@ -42,8 +52,10 @@ class Connect4Designer:
         :param agent_config: dict
         :return: class
         """
-        agent = agent_config['agent'](self.env)
-
+        agent_config = agent_config.copy()
+        Agent = agent_config['agent']
+        del agent_config['agent']
+        agent = Agent(self.env, **agent_config)
         return agent
 
     def play_game(self,render):
@@ -72,10 +84,11 @@ class Connect4Designer:
 
         winners = {
             '1':0, # player1
-            '-1':0, # player2
-            '2':0 # draw
+            '2':0, # player2
+            '-1':0 # draw
         }
         for iter in range(self._iters):
+            print(f'Running iteration {iter}')
 
             winner = self.play_game(render)
             winners[str(int(winner))] += 1

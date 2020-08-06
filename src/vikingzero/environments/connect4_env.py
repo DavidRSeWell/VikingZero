@@ -54,7 +54,7 @@ class Connect4(gym.Env):
 
         self.board = next_state
 
-        self.current_player *= -1
+        self.current_player = 1 if self.current_player == 2 else 2
 
         return curr_state,action,next_state,winner
 
@@ -122,7 +122,7 @@ class Connect4(gym.Env):
         :return:
         '''
 
-        #TODO I threw up in my mouth a little when I saw all these if statements I wrote
+        # TODO I threw up a little when I saw all these if statements I wrote
 
         # check horizontal
         c = Connect4.check_horizontal(board)
@@ -158,7 +158,7 @@ class Connect4(gym.Env):
 
         if len(num_zeros[0]) == 0:
             # we have played to this point without a winner and board is full
-            return 2
+            return -1
 
         # no winners
         return 0
