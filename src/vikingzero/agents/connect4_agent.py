@@ -275,6 +275,6 @@ class UCIOracle:
             Y_data.append(Y)
 
         return np.array(X_data).astype(float), np.array(Y_data).reshape((len(Y_data), 1))
-    
+
     def train_model(self):
         pass
