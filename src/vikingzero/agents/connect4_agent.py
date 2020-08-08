@@ -145,20 +145,18 @@ class UCIOracle:
     Agent trained from UCI Connect4 Data
     """
     @classmethod
-    def load_from_disk(cls,env,nn_path):
+    def load_from_disk(cls,env,nn_path,hidden_layer_size):
 
         inputDim = 42  # takes variable 'x'
         outputDim = 1  # takes variable 'y'
-        learningRate = 0.01
-        hidden_layer_size = 100
 
-        model = UCIOracle(inputDim, hidden_layer_size, outputDim)
+        model = UCINet(inputDim, hidden_layer_size, outputDim)
 
-        model.load_state_dict(torch.load('data/model_weights'))
+        model.load_state_dict(torch.load(nn_path))
 
         model.eval()
 
-        cls(env,nn=model)
+        return cls(env,nn=model)
 
     def __init__(self,env,data_path="",nn=None):
 

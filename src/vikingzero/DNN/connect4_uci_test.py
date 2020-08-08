@@ -118,7 +118,7 @@ if __name__ == '__main__':
         train_indexes = np.random.choice(X_indexes,size=int(train_number),replace=False)
         test_indexes = [index_i for index_i in X_indexes if index_i not in train_indexes]
 
-        def get_test_loss(X_text,Y_test):
+        def get_test_loss(X_test,Y_test):
             inputs = Variable(torch.from_numpy(X_test).type(dtype=torch.float))
 
             labels = Variable(torch.from_numpy(Y_test).type(dtype=torch.float))
@@ -139,9 +139,9 @@ if __name__ == '__main__':
 
         inputDim = X.shape[1]  # takes variable 'x'
         outputDim = 1  # takes variable 'y'
-        learningRate = 0.005
-        hidden_layer_size = 200
-        epochs = 2500
+        learningRate = 0.0025
+        hidden_layer_size = 150
+        epochs = 20000
 
         model = Net(inputDim,hidden_layer_size,outputDim)
 
@@ -165,14 +165,14 @@ if __name__ == '__main__':
 
             # get loss for the predicted output
             loss = criterion(outputs, labels)
-            print(loss)
+
             # get gradients w.r.t to parameters
             loss.backward()
 
             # update parameters
             optimizer.step()
 
-            if (epoch % 10):
+            if (epoch % 500) == 0:
 
                 train_losses.append(loss.item())
 
@@ -180,7 +180,8 @@ if __name__ == '__main__':
 
                 test_losses.append(test_loss)
 
-            print('epoch {}, loss {}'.format(epoch, loss.item()))
+                print('epoch {}, loss {}'.format(epoch, loss.item()))
+                print(f'test loss = {test_loss}')
 
         plt.plot(train_losses,label='train')
         plt.plot(test_losses,label='test')

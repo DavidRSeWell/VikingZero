@@ -14,6 +14,8 @@ jupyter = "^1.0.0"
 matplotlib = "^3.3.0"
 torch = "^1.6.0"
 torchvision = "^0.7.0"
+h5py = "^2.10.0"
+tables = "^3.6.1"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
