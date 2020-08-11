@@ -10,7 +10,10 @@ class Connect4(gym.Env):
         self._display_board = display_board
 
         self.board = np.zeros((6,7))
+
         self.current_player = 1
+
+        self.winner = None
 
     def close(self):
         self.close()
@@ -51,6 +54,9 @@ class Connect4(gym.Env):
         next_state[board_row, action] = self.current_player
 
         winner = self.check_winner(next_state)
+
+        if winner:
+            self.winner = self.current_player
 
         self.board = next_state
 

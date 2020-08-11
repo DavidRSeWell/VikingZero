@@ -17,6 +17,8 @@ except:
 
 board_f = h5py.File("/Users/befeltingu/Documents/GitHub/VikingZero/notebooks/test2.hdf5", "r")
 oracle_df = pd.read_hdf('/Users/befeltingu/Documents/GitHub/VikingZero/notebooks/oracle.hdf5',key='df')
+oracle_df['id'] = oracle_df['key']
+oracle_df.set_index('id', inplace=True, drop=False)
 
 
 class Controller:
@@ -54,16 +56,21 @@ class Controller:
             Output('connect4state_main', 'children'),
             [Input('oracle-table', 'derived_virtual_row_ids'),
              Input('oracle-table', 'selected_row_ids'),
-             Input('oracle-table', 'active_cell')])
-        def update_graphs(row_ids, selected_row_ids, active_cell):
+             Input('oracle-table', 'rows'),
+             Input('oracle-table', 'selected_row_indices')])
+        def update_graphs(row_ids, selected_row_ids, active_cell,selected_cells):
 
             print("update_graphs")
-            print(active_cell)
+            #print(active_cell)
             print(selected_row_ids)
-            #print(row_ids)
-            if active_cell:
-                row = oracle_df.iloc[active_cell['row']]
-                key = row['key']
+            print(selected_cells)
+            if selected_row_ids:
+                print(len(row_ids))
+                #row = oracle_df.iloc[active_cell['row']]
+                #key = row['key']
+                key = selected_row_ids[0]
+                print("key")
+                print(key)
                 board = board_f[key][...]
 
                 board_ui = Connect4Board(board)

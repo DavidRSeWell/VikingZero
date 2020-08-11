@@ -111,7 +111,7 @@ if __name__ == '__main__':
         ###########################
         # CREATE TEST / TRAIN SET
         ###########################
-        TRAIN_SPLIT = 0.80
+        TRAIN_SPLIT = 0.95
         train_number = int(TRAIN_SPLIT*X.shape[0])
         test_number = X.shape[0] - train_number
         X_indexes = [x_i for x_i in range(X.shape[0])]
@@ -139,9 +139,9 @@ if __name__ == '__main__':
 
         inputDim = X.shape[1]  # takes variable 'x'
         outputDim = 1  # takes variable 'y'
-        learningRate = 0.0025
+        learningRate = 0.002
         hidden_layer_size = 150
-        epochs = 20000
+        epochs = 30000
 
         model = Net(inputDim,hidden_layer_size,outputDim)
 

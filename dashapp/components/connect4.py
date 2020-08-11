@@ -9,10 +9,12 @@ import dash_bootstrap_components as dbc
 import dash_table
 
 from abc import ABC, abstractmethod
+from dash.dependencies import Output,Input
 
+board_f = h5py.File("/Users/befeltingu/Documents/GitHub/VikingZero/notebooks/test2.hdf5", "r")
 oracle_df = pd.read_hdf('/Users/befeltingu/Documents/GitHub/VikingZero/notebooks/oracle.hdf5',key='df')
-#board_f = h5py.File("/Users/befeltingu/Documents/GitHub/VikingZero/notebooks/test.hdf5", "r")
-
+oracle_df['id'] = oracle_df['key']
+oracle_df.set_index('id', inplace=True, drop=False)
 
 class Component(ABC):
 
@@ -87,22 +89,22 @@ class OracleTable(Component):
             dash_table.DataTable(
                 id='oracle-table',
                 columns=[
-                    {"name":i, "id":i ,"deletable": True, "selectable": True} for i in list(oracle_df.columns)
+                    {"name":i, "id":i ,"deletable": True, "selectable": True} for i in list(oracle_df.columns) if i != 'id'
                 ],
                 data=oracle_df.to_dict('records'),
                 editable=True,
                 filter_action="native",
                 sort_action="native",
-                sort_mode="multi",
-                column_selectable="single",
-                row_selectable="multi",
+                sort_mode='multi',
+                row_selectable='single',
                 row_deletable=True,
-                selected_columns=[],
                 selected_rows=[],
-                page_action="native",
+                page_action='native',
                 page_current=0,
                 page_size=10,
             )
         ])
 
         return layout
+
+

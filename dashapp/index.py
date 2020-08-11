@@ -59,6 +59,7 @@ content = html.Div(id="page-content", style=CONTENT_STYLE)
 
 app.layout = html.Div([dcc.Location(id="url"), sidebar, content])
 
+connect4_page = Connect4StatePage(app)
 
 # this callback uses the current pathname to set the active state of the
 # corresponding nav link to true, allowing users to tell see page they are on
@@ -80,7 +81,7 @@ def render_page_content(pathname):
     elif pathname == "/page-2":
         return html.P("This is the content of page 2. Yay!")
     elif pathname == "/mcts_connect4":
-        return Connect4StatePage().layout
+        return connect4_page.layout
     # If the user tries to reach a different page, return a 404 message
     return dbc.Jumbotron(
         [
@@ -93,8 +94,5 @@ def render_page_content(pathname):
 
 
 if __name__ == '__main__':
-
-    controller = Controller()
-    controller.register_callbacks(app)
 
     app.run_server(debug=True)

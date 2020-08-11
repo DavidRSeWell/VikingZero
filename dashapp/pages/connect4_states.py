@@ -4,13 +4,19 @@ import dash_bootstrap_components as dbc
 
 try:
     from ..components.connect4 import Connect4Board,OracleTable
+    from ..controllers.connect4_states_controller import Controller
 except:
     from components.connect4 import Connect4Board,OracleTable
+    from controllers.connect4_states_controller import Controller
 
 class Connect4StatePage:
 
-    def __init__(self):
-        pass
+    def __init__(self,app):
+        self._app = app
+        self._oracle_table = OracleTable()
+        #self._oracle_table.register_callback(self._app)
+        controller = Controller()
+        controller.register_callbacks(self._app)
 
     @property
     def layout(self):
@@ -30,7 +36,7 @@ class Connect4StatePage:
                 ]
             ),
 
-            dbc.Row([OracleTable().layout()],id="oracle-table-row")
+            dbc.Row([self._oracle_table.layout()],id="oracle-table-row")
         ])
 
         return comp

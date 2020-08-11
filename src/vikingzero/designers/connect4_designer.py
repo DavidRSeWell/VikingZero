@@ -68,17 +68,17 @@ class Connect4Designer:
 
             action = curr_player.act(self.env.board)
 
-            curr_state, action, next_state, winner = self.env.step(action)
+            curr_state, action, next_state, r = self.env.step(action)
 
             if render:
                 self.env.render()
 
-            if winner != 0:
+            if r != 0:
                 break
 
             curr_player = self.agent2
 
-        return winner
+        return self.env.winner
 
     def run(self,render=False):
 
