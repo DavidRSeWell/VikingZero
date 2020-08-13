@@ -76,7 +76,7 @@ class Connect4Designer:
             if r != 0:
                 break
 
-            curr_player = self.agent2
+            curr_player = self.agent2 if curr_player == self.agent1 else self.agent1
 
         return self.env.winner
 

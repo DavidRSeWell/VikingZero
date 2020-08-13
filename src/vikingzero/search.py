@@ -135,46 +135,51 @@ class MINIMAX:
         #main_node = node
 
         def max_value(child_node):
-            print('------ max value -------')
+            #print('------ max value -------')
 
-            print('------- BOARD ---------------')
-            print(child_node.board.reshape((3, 3)))
+            #print('------- BOARD ---------------')
+            #print(child_node.board.reshape((3, 3)))
 
             if child_node.is_terminal():
                 r = child_node.reward(player)
-                print(f'Current node has reward {r} for player {player}')
+                #print(f'Current node has reward {r} for player {player}')
                 return child_node.reward(player)
 
             v = -np.inf
             for child in child_node.get_children():
                 child_val = min_value(child)
-                print(f'CHILD WITH VALUE {child_val}')
-                print(f'current value is {v}')
+                #print(f'CHILD WITH VALUE {child_val}')
+                #print(f'current value is {v}')
                 v = max(v, child_val)
-                print(f'New value is {v}')
-                print('------- BOARD ---------------')
-                print(child.board.reshape((3, 3)))
+                #print(f'New value is {v}')
+                #print('------- BOARD ---------------')
+                #print(child.board.reshape((3, 3)))
 
+            if v == -np.inf:
+                print("stop")
             return v
 
         def min_value(child_node):
-            print('------ min value -------')
-            print('------- BOARD ---------------')
-            print(child_node.board.reshape((3, 3)))
+            #print('------ min value -------')
+            #print('------- BOARD ---------------')
+            #print(child_node.board.reshape((3, 3)))
 
             if child_node.is_terminal():
                 r = child_node.reward(player)
-                print(f'Current node has reward {r} for player {player}')
+                #print(f'Current node has reward {r} for player {player}')
                 return child_node.reward(player)
             v = np.inf
             for child in child_node.get_children():
                 child_val = max_value(child)
-                print(f'CHILD WITH VALUE {child_val}')
-                print(f'current value is {v}')
+                #print(f'CHILD WITH VALUE {child_val}')
+                #print(f'current value is {v}')
                 v = min(v, child_val)
-                print(f'New value is {v}')
-                print('------- BOARD ---------------')
-                print(child.board.reshape((3, 3)))
+                #print(f'New value is {v}')
+                #print('------- BOARD ---------------')
+                #print(child.board.reshape((3, 3)))
+
+            if v == np.inf:
+                print("stop")
             return v
 
         # Body of minmax_decision:
@@ -182,14 +187,20 @@ class MINIMAX:
         #for c in children:
         #    if c not in self.children:
         #        self.children[main_node] = c
-        values = []
-        for child in node.get_children():
-            values.append(min_value(child))
+        #values = []
+        #for child in node.get_children():
+        #    values.append(min_value(child))
         #values = [min_value(child) for child in node.get_children()]
         return max(node.get_children(), key=lambda child: min_value(child))
 
     def run(self,node):
-
+        test_board = np.zeros(9,)
+        test_board[0] = 1
+        test_board[1] = 1
+        test_board[2] = 2
+        test_board[4] = 2
+        if np.equal(node.board,test_board).all():
+            print("pause!")
         if node in self.children:
             return self.policy[node]
 

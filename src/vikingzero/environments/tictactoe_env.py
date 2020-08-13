@@ -16,12 +16,16 @@ class TicTacToe:
         self._display_board = display_board
         self.current_player = 1
         self.board = np.zeros(9,)
-        self.board[0] = 1
-        self.board[1] = 1
-        self.board[2] = 2
-        self.board[3] = 2
-        self.board[7] = 1
-        self.board[8] = 2
+
+        def run_test():
+            self.board[0] = 1
+            self.board[1] = 1
+            self.board[2] = 2
+            self.board[4] = 2
+            #self.board[7] = 1
+            #self.board[8] = 2
+
+        #run_test()
 
         self.board_string = """
                 | {s1} | {s2} | {s3} |    
@@ -58,12 +62,17 @@ class TicTacToe:
         :return:
         """
         self.board = np.zeros(9,)
-        self.board[0] = 1
-        self.board[1] = 1
-        self.board[2] = 2
-        self.board[3] = 2
-        self.board[7] = 1
-        self.board[8] = 2
+
+        def run_test():
+            self.board[0] = 1
+            self.board[1] = 1
+            self.board[2] = 2
+            self.board[4] = 2
+            # self.board[7] = 1
+            # self.board[8] = 2
+
+        #run_test()
+
         self.current_player = 1
 
     def render(self):
@@ -91,7 +100,7 @@ class TicTacToe:
             self.board = next_state
 
             reward, winner = self.check_winner(self.board)
-            r = reward[self.current_player]
+            r = reward[self.current_player - 1]
 
             if not winner:
                 self.current_player = 1 if self.current_player == 2 else 2
@@ -99,7 +108,7 @@ class TicTacToe:
             else:
                 self.winner = winner
 
-            return curr_state,action,next_state,r
+            return curr_state,action,next_state,winner
 
         else:
             print("The action {} by player {} not legal!!!".format(self.current_player,action))
@@ -129,7 +138,7 @@ class TicTacToe:
     def is_draw(board):
 
         zero_count = len(np.where(board == 0)[0])
-        if zero_count == 0 and not TicTacToe.is_win(board):
+        if zero_count == 0 and TicTacToe.is_win(board) == -1:
             return True
         else:
             return False
@@ -170,6 +179,7 @@ class TicTacToe:
 
     @staticmethod
     def next_state(state,action,player):
+
         actions = TicTacToe.actions(state)
         if len(actions) == 0:
             print("The current state is a terminal state cannot get next state")
