@@ -4,7 +4,7 @@ import torch
 from collections import namedtuple
 
 from ..environments.connect4_env import Connect4
-from ..mcts import MCTS,Node
+from ..search import MCTS,Node
 from ..DNN.nn import UCINet
 
 _CN4 = namedtuple("Connect4Node", "env board player winner")

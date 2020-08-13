@@ -7,6 +7,8 @@ https://gist.github.com/qpwo/c538c6f73727e254fdc7fab81024f6e1
 from abc import ABC,abstractmethod
 from collections import defaultdict
 
+import numpy as np
+
 
 class MCTS:
     """
@@ -53,15 +55,12 @@ class MCTS:
         based on some simulate mechanism. Could be rollout or could be a NN
         :return:
         """
-        #invert_reward = True
         player = node.player
         while True:
             if node.is_terminal():
                 reward = node.reward(player)
                 return reward
-                #return 1 - reward if invert_reward else reward
             node = node.find_random_child()
-            #invert_reward = not invert_reward
 
     def select(self,node):
         """
@@ -108,6 +107,99 @@ class MCTS:
         self.expand(leaf)
         reward = self.simulate(leaf)
         self.backup(path, reward)
+
+
+class MINIMAX:
+
+    def __init__(self):
+        """
+        :param c: Exploration hyper parameter
+        """
+
+        self.children = dict()
+        self.policy = dict()
+
+    def get_parent_action(self,parent,child):
+
+        diff = parent.board - child.board
+        diffs = np.where(diff != 0)[0]
+        a = diffs[0]
+        assert len(diffs) == 1
+        #assert child.board[a] == parent.player
+        return a
+
+    def minmax_decision(self,node):
+        """ Code borrowed from https://github.com/aimacode/aima-python/blob/master/games.py"""
+
+        player = node.player
+        #main_node = node
+
+        def max_value(child_node):
+            print('------ max value -------')
+
+            print('------- BOARD ---------------')
+            print(child_node.board.reshape((3, 3)))
+
+            if child_node.is_terminal():
+                r = child_node.reward(player)
+                print(f'Current node has reward {r} for player {player}')
+                return child_node.reward(player)
+
+            v = -np.inf
+            for child in child_node.get_children():
+                child_val = min_value(child)
+                print(f'CHILD WITH VALUE {child_val}')
+                print(f'current value is {v}')
+                v = max(v, child_val)
+                print(f'New value is {v}')
+                print('------- BOARD ---------------')
+                print(child.board.reshape((3, 3)))
+
+            return v
+
+        def min_value(child_node):
+            print('------ min value -------')
+            print('------- BOARD ---------------')
+            print(child_node.board.reshape((3, 3)))
+
+            if child_node.is_terminal():
+                r = child_node.reward(player)
+                print(f'Current node has reward {r} for player {player}')
+                return child_node.reward(player)
+            v = np.inf
+            for child in child_node.get_children():
+                child_val = max_value(child)
+                print(f'CHILD WITH VALUE {child_val}')
+                print(f'current value is {v}')
+                v = min(v, child_val)
+                print(f'New value is {v}')
+                print('------- BOARD ---------------')
+                print(child.board.reshape((3, 3)))
+            return v
+
+        # Body of minmax_decision:
+        #children = node.get_children()
+        #for c in children:
+        #    if c not in self.children:
+        #        self.children[main_node] = c
+        values = []
+        for child in node.get_children():
+            values.append(min_value(child))
+        #values = [min_value(child) for child in node.get_children()]
+        return max(node.get_children(), key=lambda child: min_value(child))
+
+    def run(self,node):
+
+        if node in self.children:
+            return self.policy[node]
+
+        else:
+            max_child = self.minmax_decision(node)
+            a = self.get_parent_action(node,max_child)
+            self.children[node] = max_child
+            node.action = a
+            self.policy[node] = a
+            return a
 
 
 class Node(ABC):
