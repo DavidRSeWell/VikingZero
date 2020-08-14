@@ -4,7 +4,7 @@ import torch
 from collections import namedtuple
 
 from ..environments.connect4_env import Connect4
-from ..search import MCTS,Node
+from ..search import MCTS,MINIMAX,Node
 from ..DNN.nn import UCINet
 
 _CN4 = namedtuple("Connect4Node", "env board player winner")
@@ -27,6 +27,24 @@ class RandomConnect4Agent:
         valid_actions = self._env.valid_actions(s)
 
         return np.random.choice(valid_actions,1)[0]
+
+
+class Connect4MinMax(MINIMAX):
+
+    def __init__(self,env: Connect4,player = 1,type="minimax"):
+        super().__init__()
+
+        self._env = env
+        self._player = player
+        self._type = type
+
+    def act(self,board):
+
+        s = Connect4Node(self._env,board,self._player)
+
+        a = self.run(s,type=self._type)
+
+        return a
 
 
 class Connect4Node(Node):
@@ -67,11 +85,13 @@ class Connect4Node(Node):
 
     def reward(self,player):
         "Assumes `self` is terminal node. 1=win, 0=loss, .5=tie, etc"
+        assert self.is_terminal()
+
         reward = 1
         if int(self.winner) != player:
-            reward = 0
+            reward = -1
         elif self.winner == -1:
-            reward = 0.5
+            reward = 0
 
         return reward
 

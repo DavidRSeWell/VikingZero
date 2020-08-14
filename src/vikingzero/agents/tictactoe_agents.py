@@ -3,6 +3,25 @@ import numpy as np
 from ..environments.tictactoe_env import TicTacToe
 from ..search import Node,MINIMAX
 
+class HumanAgent:
+
+    def __init__(self,env):
+        self._env = env
+
+    def act(self,s):
+
+        while True:
+            try:
+                action = int(input("Enter Action: "))
+
+
+                valid_actions = self._env.actions(self._env.board)
+
+                if action in valid_actions:
+                    return action
+            except:
+
+                print(f"action is invalid valid action are")
 
 class RandomTicTacToeAgent:
     """
@@ -24,17 +43,18 @@ class RandomTicTacToeAgent:
 
 class TicTacToeMinMax(MINIMAX):
 
-    def __init__(self,env: TicTacToe,player = 1):
+    def __init__(self,env: TicTacToe,player = 1,type="minimax"):
         super().__init__()
 
         self._env = env
         self._player = player
+        self._type = type
 
     def act(self,board):
 
         s = TicTacToeNode(self._env,board,self._player)
 
-        a = self.run(s)
+        a = self.run(s,type=self._type)
 
         return a
 

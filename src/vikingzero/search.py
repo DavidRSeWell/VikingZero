@@ -121,96 +121,198 @@ class MINIMAX:
 
     def get_parent_action(self,parent,child):
 
-        diff = parent.board - child.board
-        diffs = np.where(diff != 0)[0]
-        a = diffs[0]
-        assert len(diffs) == 1
-        #assert child.board[a] == parent.player
-        return a
+        a = parent.board
+        b = child.board
+
+        diff = a - b
+        diffs = np.where(diff != 0)
+
+        if a.shape[0] == 9: # tictactoe
+            action = diffs[0][0]
+        elif len(a.flatten()) == 42: # Connect4
+            action = diffs[1][0]
+
+        return action
 
     def minmax_decision(self,node):
         """ Code borrowed from https://github.com/aimacode/aima-python/blob/master/games.py"""
 
         player = node.player
-        #main_node = node
 
         def max_value(child_node):
-            #print('------ max value -------')
-
-            #print('------- BOARD ---------------')
-            #print(child_node.board.reshape((3, 3)))
 
             if child_node.is_terminal():
-                r = child_node.reward(player)
-                #print(f'Current node has reward {r} for player {player}')
                 return child_node.reward(player)
 
             v = -np.inf
             for child in child_node.get_children():
-                child_val = min_value(child)
-                #print(f'CHILD WITH VALUE {child_val}')
-                #print(f'current value is {v}')
-                v = max(v, child_val)
-                #print(f'New value is {v}')
-                #print('------- BOARD ---------------')
-                #print(child.board.reshape((3, 3)))
+                v = max(v, min_value(child))
 
-            if v == -np.inf:
-                print("stop")
             return v
 
         def min_value(child_node):
-            #print('------ min value -------')
-            #print('------- BOARD ---------------')
-            #print(child_node.board.reshape((3, 3)))
 
             if child_node.is_terminal():
-                r = child_node.reward(player)
-                #print(f'Current node has reward {r} for player {player}')
+               return child_node.reward(player)
+            v = np.inf
+            for child in child_node.get_children():
+
+               v = min(v, max_value(child))
+
+            return v
+
+        return max(node.get_children(), key=lambda child: min_value(child))
+
+    def alpha_beta(self,node):
+
+        player = node.player
+
+        def max_value(child_node,alpha,beta):
+
+            if child_node.is_terminal():
+                return child_node.reward(player)
+
+            v = -np.inf
+            for child in child_node.get_children():
+                v = max(v, min_value(child,alpha,beta))
+
+                if v >= beta:
+                    return v
+
+                alpha = max(v,alpha)
+
+            return v
+
+        def min_value(child_node,alpha,beta):
+
+            if child_node.is_terminal():
                 return child_node.reward(player)
             v = np.inf
             for child in child_node.get_children():
-                child_val = max_value(child)
-                #print(f'CHILD WITH VALUE {child_val}')
-                #print(f'current value is {v}')
-                v = min(v, child_val)
-                #print(f'New value is {v}')
-                #print('------- BOARD ---------------')
-                #print(child.board.reshape((3, 3)))
+                v = min(v, max_value(child,alpha,beta))
 
-            if v == np.inf:
-                print("stop")
+                if v <= alpha:
+                    return v
+                beta = min(v,beta)
+
             return v
 
-        # Body of minmax_decision:
-        #children = node.get_children()
-        #for c in children:
-        #    if c not in self.children:
-        #        self.children[main_node] = c
-        #values = []
-        #for child in node.get_children():
-        #    values.append(min_value(child))
-        #values = [min_value(child) for child in node.get_children()]
-        return max(node.get_children(), key=lambda child: min_value(child))
+        # Body of alpha_beta_search:
+        best_score = -np.inf
+        beta = np.inf
+        best_action = None
+        for child in node.get_children():
+            v = min_value(child, best_score, beta)
+            if v > best_score:
+                best_score = v
+                best_action = child
 
-    def run(self,node):
-        test_board = np.zeros(9,)
-        test_board[0] = 1
-        test_board[1] = 1
-        test_board[2] = 2
-        test_board[4] = 2
-        if np.equal(node.board,test_board).all():
-            print("pause!")
+        return best_action
+
+    def alpha_beta_depth(self,node,cutoff_test=None):
+
+        player = node.player
+
+        def max_value(child_node, alpha, beta, depth):
+
+            if cutoff_test(child_node,depth):
+
+                return self.simulate(child_node,player)
+
+            v = -np.inf
+            for child in child_node.get_children():
+
+                v = max(v, min_value(child, alpha, beta, depth + 1))
+
+                if v >= beta:
+                    return v
+
+                alpha = max(v, alpha)
+
+            return v
+
+        def min_value(child_node, alpha, beta, depth):
+
+            if cutoff_test(child_node,depth):
+                return self.simulate(child_node,player)
+
+            v = np.inf
+            for child in child_node.get_children():
+                v = min(v, max_value(child, alpha, beta,depth + 1))
+
+                if v <= alpha:
+                    return v
+                beta = min(v, beta)
+
+            return v
+
+        # Body of alpha_beta_search:
+        best_score = -np.inf
+        beta = np.inf
+        best_action = None
+        vs = []
+        for child in node.get_children():
+            v = min_value(child, best_score, beta,1)
+            vs.append(v)
+            if v > best_score:
+                best_score = v
+                best_action = child
+
+        print(vs)
+        return best_action
+
+    def run(self,node,type="minimax",d=2):
+
         if node in self.children:
             return self.policy[node]
 
         else:
-            max_child = self.minmax_decision(node)
-            a = self.get_parent_action(node,max_child)
+
+            max_child = None
+
+            if type == "minimax":
+
+                max_child = self.minmax_decision(node)
+
+            elif type == "alphabeta":
+
+                max_child = self.alpha_beta(node)
+
+            elif type == "alphabeta_depth":
+
+                cutoff_test = lambda node, depth: depth > d or node.is_terminal()
+
+                max_child = self.alpha_beta_depth(node,cutoff_test=cutoff_test)
+
+            else:
+                raise Exception(f"Inccorect minimax alogrithm type {type}")
+
+            a = self.get_parent_action(node, max_child)
+
             self.children[node] = max_child
+
             node.action = a
+
             self.policy[node] = a
+
             return a
+
+    def simulate(self,node,player,n=5) -> float:
+        """
+        Compute an estimate of the value fo the current node
+        based on some simulate mechanism. Could be rollout or could be a NN
+        :return:
+        """
+
+        r = 0
+        for _ in range(n):
+            curr_node = node
+            while True:
+                if curr_node.is_terminal():
+                    r += curr_node.reward(player)
+                    break
+                curr_node = curr_node.find_random_child()
+        return r
 
 
 class Node(ABC):

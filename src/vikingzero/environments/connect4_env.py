@@ -1,6 +1,7 @@
 import numpy as np
 import gym
 
+
 class Connect4(gym.Env):
 
     metadata = {'render.modes': ['human']}
@@ -28,6 +29,10 @@ class Connect4(gym.Env):
         legal_play = np.where(board[:, action] == 0)[0]
 
         if len(legal_play) == 0:
+            print('No legal move')
+            print('BOARD')
+            print(board)
+            print(action)
             raise Exception(f'Illegal move {action}')
 
         else:
@@ -35,6 +40,8 @@ class Connect4(gym.Env):
 
     def reset(self):
         self.board = np.zeros((6, 7))
+        self.current_player = 1
+        self.winner = None
 
     def render(self, mode='human'):
         print(self.board)
@@ -177,11 +184,3 @@ class Connect4(gym.Env):
         """
         return np.where(s[0,:] == 0)[0]
 
-if __name__ == '__main__':
-
-    env = Connect4(display_board=True)
-
-    env.step(4)
-    env.step(4)
-
-    print('Done running connect4')
