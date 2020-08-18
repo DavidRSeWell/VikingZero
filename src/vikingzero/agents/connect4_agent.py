@@ -31,10 +31,12 @@ class RandomConnect4Agent:
 
 class Connect4MinMax(MINIMAX):
 
-    def __init__(self,env: Connect4,player = 1,type="minimax"):
+    def __init__(self,env: Connect4,player = 1,type="minimax",depth=2):
         super().__init__()
 
+        print(f"Loading MINMAX agent with type = {type}")
         self._env = env
+        self._d = depth
         self._player = player
         self._type = type
 
@@ -42,7 +44,7 @@ class Connect4MinMax(MINIMAX):
 
         s = Connect4Node(self._env,board,self._player)
 
-        a = self.run(s,type=self._type)
+        a = self.run(s,type=self._type,d=self._d)
 
         return a
 
@@ -106,6 +108,8 @@ class Connect4MCTS(MCTS):
 
     def __init__(self,env: Connect4, n_sim: int = 50,c: int = 1,player = 1):
         super().__init__(c)
+
+        print(f"Loaded MCTS with nsim = {n_sim} c = {c} player = {player}")
         self._env = env
         self._num_sim = n_sim
         self._player = player
@@ -126,16 +130,33 @@ class Connect4MCTS(MCTS):
     def get_max_action(self,s) -> int:
 
         if s not in self.children:
-            raise Exception(f'Node {s} does not exist in the tree')
+            raise Exception(f"Node {s} does not exist in the tree")
 
         if self._env.check_winner(s.board):
-            raise Exception('Attempting to compute action on a leaf node')
+            raise Exception("Attempting to compute action on a leaf node")
 
         children = self.children
 
         values = [self._Q[c] / self._N[c] for c in children[s]]
 
-        return np.argmax(np.array(values))
+        max_child = children[s][np.argmax(np.array(values))]
+
+        action = self.get_parent_ation(s,max_child)
+
+        return action
+
+    def get_parent_ation(self,parent,child):
+
+        a = parent.board
+
+        b = child.board
+
+        diff = a - b
+        diffs = np.where(diff != 0)
+
+        action = diffs[1][0]
+
+        return action
 
     def select_child(self,node):
 
@@ -167,8 +188,8 @@ class UCIOracle:
     @classmethod
     def load_from_disk(cls,env,nn_path,hidden_layer_size):
 
-        inputDim = 42  # takes variable 'x'
-        outputDim = 1  # takes variable 'y'
+        inputDim = 42  # takes variable "x"
+        outputDim = 1  # takes variable "y"
 
         model = UCINet(inputDim, hidden_layer_size, outputDim)
 
@@ -213,12 +234,12 @@ class UCIOracle:
             self._pi[self.hash_numpy(board)] = max_a
 
     def convert_to_numpy(self,x):
-        '''
+        """
         Function to take the UCI format for connect 4
         and convert it to numpy.
         :param x:
         :return:
-        '''
+        """
 
         # TODO this assumes a fixed board dim
         new_x = np.zeros((6, 7))
@@ -268,26 +289,26 @@ class UCIOracle:
         return hash(x.data.tobytes())
 
     def process_data(self,data_path):
-        '''
+        """
         Read in .data file and return structured
         data in numpy array
         :param data_path:
         :return:
-        '''
-        data_file = open(data_path, 'r')
+        """
+        data_file = open(data_path, "r")
 
         data = data_file.readlines()
 
         X_data, Y_data = [], []
         for i, d in enumerate(data):
 
-            a = d.replace('b', '0').replace('x', '1').replace('o', '2').replace('\n', '').split(',')
+            a = d.replace("b", "0").replace("x", "1").replace("o", "2").replace("\n", "").split(",")
             X = a[:-1]
             X = self.convert_to_numpy(X)
             Y = -1.0
-            if 'win' in a[-1]:
+            if "win" in a[-1]:
                 Y = 1.0
-            elif 'draw' in a[-1]:
+            elif "draw" in a[-1]:
                 Y = 0.0
             X_data.append(X)
             Y_data.append(Y)

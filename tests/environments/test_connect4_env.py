@@ -301,4 +301,23 @@ def test_connect_4_valid_actions():
 
     assert len(valid_actions) == 0
 
+    # CASE 4:
+
+    board = np.array([[1., 0., 0., 0., 0., 0., 0.],
+                    [2., 0., 0., 0., 0., 0., 0.],
+                    [1., 0., 0., 0., 0., 0., 0.],
+                    [2.0, 2.0,1.0,0.,0.,0.,0.],
+                    [2., 1., 1., 0., 1., 0., 0.],
+                    [1.,2.,1.,2.,2.,0.,0.]])
+
+    valid_actions = env.valid_actions(board)
+
+    print(valid_actions)
+    assert len(valid_actions) == 6
+
+    print("PASSED Valid actions")
+
+
+if __name__ == "__main__":
+    test_connect_4_valid_actions()
 

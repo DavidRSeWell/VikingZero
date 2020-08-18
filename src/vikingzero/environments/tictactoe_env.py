@@ -18,10 +18,16 @@ class TicTacToe:
         self.board = np.zeros(9,)
 
         def run_test():
-            self.board[0] = 1
-            self.board[1] = 1
-            self.board[2] = 2
-            self.board[4] = 2
+            board = [[2., 2., 1.],
+                    [0., 2., 1.],
+                    [0.,1.,0.]]
+
+            self.board = np.array(board).flatten()
+
+            #self.board[0] = 1
+            #self.board[1] = 1
+            #self.board[2] = 2
+            #self.board[4] = 2
             #self.board[7] = 1
             #self.board[8] = 2
 
@@ -64,10 +70,15 @@ class TicTacToe:
         self.board = np.zeros(9,)
 
         def run_test():
-            self.board[0] = 1
-            self.board[1] = 1
-            self.board[2] = 2
-            self.board[4] = 2
+            board = [[2., 2., 1.],
+                          [0., 2., 1.],
+                          [0., 1., 0.]]
+
+            self.board = np.array(board).flatten()
+            #self.board[0] = 1
+            #self.board[1] = 1
+            #self.board[2] = 2
+            #self.board[4] = 2
             # self.board[7] = 1
             # self.board[8] = 2
 

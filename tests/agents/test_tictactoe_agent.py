@@ -1,6 +1,6 @@
 import numpy as np
 
-from vikingzero.agents.tictactoe_agents import RandomTicTacToeAgent,TicTacToeMinMax,HumanAgent
+from vikingzero.agents.tictactoe_agents import RandomTicTacToeAgent,TicTacToeMinMax,HumanAgent,TicTacToeMCTS
 from vikingzero.designers.connect4_designer import Connect4Designer
 from vikingzero.environments.tictactoe_env import TicTacToe
 
@@ -38,18 +38,20 @@ def test_designer():
     env = TicTacToe()
 
     agent1_config = {
-        'agent': TicTacToeMinMax,
+        'agent': TicTacToeMCTS,
         'player':1,
-        'type':"alphabeta"
+        'n_sim': 100,
+        'c': 1
+        #'type':"alphabeta"
     }
 
     agent2_config = {
-        'agent': HumanAgent
+        'agent': RandomTicTacToeAgent,
         #'player':2,
         #'type': "alphabeta"
     }
 
-    designer = Connect4Designer(iters=5,env=env
+    designer = Connect4Designer(iters=50,env=env
                                 ,agent1_config=agent1_config
                                 ,agent2_config=agent2_config
                                 )

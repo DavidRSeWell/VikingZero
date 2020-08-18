@@ -66,7 +66,7 @@ class Connect4Designer:
 
         while True:
 
-            action = curr_player.act(self.env.board)
+            action = curr_player.act(self.env.board,render)
 
             curr_state, action, next_state, r = self.env.step(action)
 
@@ -80,17 +80,23 @@ class Connect4Designer:
 
         return self.env.winner
 
-    def run(self,render=False):
+    def run(self,render=False,show_every=5):
 
         winners = {
             '1':0, # player1
             '2':0, # player2
             '-1':0 # draw
         }
+
         for iter in range(self._iters):
             print(f'Running iteration {iter}')
 
-            winner = self.play_game(render)
+            if (iter % show_every) == 0:
+                winner = self.play_game(render)
+
+            else:
+                winner = self.play_game(render=False)
+
             winners[str(int(winner))] += 1
 
         print(winners)

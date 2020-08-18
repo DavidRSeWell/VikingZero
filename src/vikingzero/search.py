@@ -33,10 +33,12 @@ class MCTS:
         to the current leaf node
         :return:
         """
+        winner,r = reward
         for node in reversed(path):
             self._N[node] += 1
-            self._Q[node] += reward
-            reward = 1 - reward  # 1 for me is 0 for my enemy, and vice versa
+            if node.player != winner:
+                self._Q[node] += r
+            #reward = 1 - reward  # 1 for me is 0 for my enemy, and vice versa
 
     def expand(self,node):
         """
@@ -45,7 +47,7 @@ class MCTS:
         :param node:
         :return:
         """
-        if node in self.children:
+        if (node in self.children) or node.is_terminal():
             return  # already expanded
         self.children[node] = node.get_children()
 
@@ -55,10 +57,13 @@ class MCTS:
         based on some simulate mechanism. Could be rollout or could be a NN
         :return:
         """
-        player = node.player
+        #player = node.player
         while True:
             if node.is_terminal():
-                reward = node.reward(player)
+                reward = node.reward()
+                #return reward
+                if not reward:
+                    print('huh')
                 return reward
             node = node.find_random_child()
 
@@ -209,7 +214,7 @@ class MINIMAX:
 
         return best_action
 
-    def alpha_beta_depth(self,node,cutoff_test=None):
+    def alpha_beta_depth(self,node,cutoff_test=None,n=5):
 
         player = node.player
 
@@ -217,7 +222,7 @@ class MINIMAX:
 
             if cutoff_test(child_node,depth):
 
-                return self.simulate(child_node,player)
+                return self.simulate(child_node,player,n=n)
 
             v = -np.inf
             for child in child_node.get_children():
@@ -234,7 +239,7 @@ class MINIMAX:
         def min_value(child_node, alpha, beta, depth):
 
             if cutoff_test(child_node,depth):
-                return self.simulate(child_node,player)
+                return self.simulate(child_node,player,n=n)
 
             v = np.inf
             for child in child_node.get_children():
@@ -261,7 +266,7 @@ class MINIMAX:
         print(vs)
         return best_action
 
-    def run(self,node,type="minimax",d=2):
+    def run(self,node,type="minimax",d=2,n=5):
 
         if node in self.children:
             return self.policy[node]
@@ -282,7 +287,7 @@ class MINIMAX:
 
                 cutoff_test = lambda node, depth: depth > d or node.is_terminal()
 
-                max_child = self.alpha_beta_depth(node,cutoff_test=cutoff_test)
+                max_child = self.alpha_beta_depth(node,cutoff_test=cutoff_test,n=n)
 
             else:
                 raise Exception(f"Inccorect minimax alogrithm type {type}")
