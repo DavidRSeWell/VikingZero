@@ -66,7 +66,7 @@ class Connect4Designer:
 
         while True:
 
-            action = curr_player.act(self.env.board,render)
+            action = curr_player.act(self.env.board)
 
             curr_state, action, next_state, r = self.env.step(action)
 

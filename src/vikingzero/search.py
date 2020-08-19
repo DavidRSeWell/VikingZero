@@ -51,7 +51,7 @@ class MCTS:
             return  # already expanded
         self.children[node] = node.get_children()
 
-    def simulate(self,node) -> int:
+    def simulate(self,node) -> tuple:
         """
         Compute an estimate of the value fo the current node
         based on some simulate mechanism. Could be rollout or could be a NN
@@ -61,10 +61,7 @@ class MCTS:
         while True:
             if node.is_terminal():
                 reward = node.reward()
-                #return reward
-                if not reward:
-                    print('huh')
-                return reward
+                return (node.winner, reward)
             node = node.find_random_child()
 
     def select(self,node):
@@ -165,6 +162,10 @@ class MINIMAX:
                v = min(v, max_value(child))
 
             return v
+
+        values = []
+        for child in node.get_children():
+            values.append(min_value(child))
 
         return max(node.get_children(), key=lambda child: min_value(child))
 

@@ -85,17 +85,17 @@ class Connect4Node(Node):
         "Returns True if the node has no children"
         return True if self.env.check_winner(self.board) else False
 
-    def reward(self,player):
+    def reward(self):
         "Assumes `self` is terminal node. 1=win, 0=loss, .5=tie, etc"
         assert self.is_terminal()
-
-        reward = 1
-        if int(self.winner) != player:
-            reward = -1
-        elif self.winner == -1:
-            reward = 0
-
-        return reward
+        if self.winner == -1:
+            # TODO
+            return 0.5
+        elif int(self.winner) != self.player:
+            reward = 1
+            return reward
+        else:
+            print("wtf")
 
     def __eq__(self, other):
         return np.equal(other.board,self.board).all() and other.player == self.player and other.winner == self.winner

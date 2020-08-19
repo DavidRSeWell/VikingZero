@@ -9,7 +9,7 @@ class HumanAgent:
     def __init__(self,env):
         self._env = env
 
-    def act(self,s,r):
+    def act(self,s):
 
         while True:
             try:
@@ -33,7 +33,7 @@ class RandomTicTacToeAgent:
 
         self._env = env
 
-    def act(self,s,r):
+    def act(self,s,r=0):
         """
         Take an action given a state
         :param s:
@@ -55,7 +55,7 @@ class TicTacToeMinMax(MINIMAX):
 
     def act(self,board):
 
-        s = TicTacToeNode(self._env,board,self._player)
+        s = TicTacMiniNode(self._env,board,self._player)
 
         a = self.run(s,type=self._type)
 
@@ -75,9 +75,6 @@ class TicTacToeNode(Node):
         children = self.get_children()
         random_child = np.random.choice(children, 1)[0]
         assert type(random_child) == TicTacToeNode
-        if random_child.player == self.player:
-            print("wtf")
-            raise Exception("")
         return random_child
 
     def get_children(self):
@@ -90,8 +87,6 @@ class TicTacToeNode(Node):
 
             next_board = self.env.next_state(curr_board,a, self.player)
             r, winner = self.env.check_winner(next_board)
-            if winner == player:
-                print('wtf')
             next_node = TicTacToeNode(env=self.env, board=next_board, player=player, winner=winner)
             children.append(next_node)
         return children
@@ -105,12 +100,64 @@ class TicTacToeNode(Node):
     def reward(self):
         if self.winner == -1:
             #TODO
-            return (-1,0.5)
+            return 0.5
         elif int(self.winner) != self.player:
             reward = 1
-            return (self.winner,reward)
+            return reward
         else:
             print("wtf")
+
+    @property
+    def actions(self):
+        return self.env.actions(self.board)
+
+    def __eq__(self, other):
+        return np.equal(other.board,self.board).all() and other.player == self.player and other.winner == self.winner
+
+    def __hash__(self):
+        return hash((self.board.data.tobytes(),self.player,self.winner))
+
+
+class TicTacMiniNode(Node):
+    def __init__(self,env: TicTacToe,board: np.array, player: int, winner = 0):
+        self.action = None
+        self.board = board
+        self.player = player
+        self.env = env
+        self.winner = winner
+
+    def find_random_child(self):
+        children = self.get_children()
+        random_child = np.random.choice(children, 1)[0]
+        assert type(random_child) == TicTacMiniNode
+        return random_child
+
+    def get_children(self):
+
+        valid_actions = self.env.actions(self.board)
+        curr_board = self.board.copy()
+        children = []
+        player = 2 if self.player == 1 else 1
+        for a in valid_actions:
+            next_board = self.env.next_state(curr_board,a, self.player)
+            r, winner = self.env.check_winner(next_board)
+            next_node = TicTacMiniNode(env=self.env, board=next_board, player=player, winner=winner)
+            children.append(next_node)
+        return children
+
+    def is_terminal(self):
+        return True if self.env.is_win(self.board) else False
+
+    def next_state(self,a):
+        return self.env.next_state(self.board,a,self.player)
+
+    def reward(self,player):
+        reward = 1
+        if self.winner == -1:
+            return 0
+        elif int(self.winner) != player:
+            reward = -1
+        return reward
 
     @property
     def actions(self):
@@ -133,7 +180,7 @@ class TicTacToeMCTS(MCTS):
         self._num_sim = n_sim
         self._player = player
 
-    def act(self,board,render):
+    def act(self,board,render=False):
 
         s = TicTacToeNode(self._env,board,self._player,0)
         # First rum simulations to collect
@@ -159,7 +206,7 @@ class TicTacToeMCTS(MCTS):
 
         return board,board2
 
-    def get_max_action(self,s,render) -> int:
+    def get_max_action(self,s,render=False) -> int:
 
         if s not in self.children:
             raise Exception(f"Node {s} does not exist in the tree")

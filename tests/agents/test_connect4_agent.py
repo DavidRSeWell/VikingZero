@@ -37,13 +37,13 @@ def test_designer():
 
     env = Connect4()
 
-    agent1_config = {
+    agent2_config = {
         "agent": Connect4MinMax,
         "player":1,
         "type":"alphabeta_depth"
     }
 
-    agent2_config = {
+    agent1_config = {
         "agent": Connect4MCTS,
         "player": 2,
         "c":np.sqrt(2),

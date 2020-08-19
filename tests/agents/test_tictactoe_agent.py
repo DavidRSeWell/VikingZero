@@ -38,18 +38,28 @@ def test_designer():
     env = TicTacToe()
 
     agent1_config = {
+        'agent': TicTacToeMinMax,
+        'player': 1,
+        'type': "minimax"
+    }
+
+    agent2_config = {
         'agent': TicTacToeMCTS,
-        'player':1,
-        'n_sim': 100,
+        'player':2,
+        'n_sim': 50,
         'c': 1
         #'type':"alphabeta"
     }
 
-    agent2_config = {
-        'agent': RandomTicTacToeAgent,
-        #'player':2,
-        #'type': "alphabeta"
-    }
+
+    #agent2_config = {
+    #    'agent': RandomTicTacToeAgent,
+        #'player': 2
+    #}
+
+
+
+
 
     designer = Connect4Designer(iters=50,env=env
                                 ,agent1_config=agent1_config
