@@ -4,9 +4,11 @@ from sacred import Experiment
 
 
 try:
+    from ..utils import load_agent,load_env
     from ..agents.connect4_agent import RandomConnect4Agent, Connect4MCTS
     from ..environments.connect4_env import Connect4
 except:
+    from vikingzero.utils import load_agent,load_env
     from vikingzero.agents.connect4_agent import RandomConnect4Agent, Connect4MCTS
     from vikingzero.environments.connect4_env import Connect4
 
@@ -38,6 +40,7 @@ class Connect4Designer:
 
     def __init__(self,iters,env,agent1_config,agent2_config):
 
+
         self._agent1_config = agent1_config
         self._agent2_config = agent2_config
         self._iters = iters
@@ -53,8 +56,9 @@ class Connect4Designer:
         :return: class
         """
         agent_config = agent_config.copy()
-        Agent = agent_config['agent']
+        agent_name = agent_config['agent']
         del agent_config['agent']
+        Agent = load_agent(agent_name)
         agent = Agent(self.env, **agent_config)
         return agent
 

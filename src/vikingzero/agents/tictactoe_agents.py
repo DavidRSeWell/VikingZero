@@ -1,5 +1,7 @@
 import numpy as np
 
+from abc import abstractmethod
+
 from ..environments.tictactoe_env import TicTacToe
 from ..search import MCTS,MINIMAX,Node
 
@@ -64,17 +66,18 @@ class TicTacToeMinMax(MINIMAX):
 
 class TicTacToeNode(Node):
 
-    def __init__(self,env: TicTacToe,board: np.array, player: int, winner = 0):
+    def __init__(self,env: TicTacToe,node_type,board: np.array, player: int, winner = 0):
         self.action = None
         self.board = board
         self.player = player
         self.env = env
+        self.node = node_type
         self.winner = winner
 
     def find_random_child(self):
         children = self.get_children()
         random_child = np.random.choice(children, 1)[0]
-        assert type(random_child) == TicTacToeNode
+        assert type(random_child) == self.node
         return random_child
 
     def get_children(self):
@@ -87,7 +90,7 @@ class TicTacToeNode(Node):
 
             next_board = self.env.next_state(curr_board,a, self.player)
             r, winner = self.env.check_winner(next_board)
-            next_node = TicTacToeNode(env=self.env, board=next_board, player=player, winner=winner)
+            next_node = self.node(env=self.env, board=next_board, player=player, winner=winner)
             children.append(next_node)
         return children
 
@@ -97,15 +100,9 @@ class TicTacToeNode(Node):
     def next_state(self,a):
         return self.env.next_state(self.board,a,self.player)
 
-    def reward(self):
-        if self.winner == -1:
-            #TODO
-            return 0.5
-        elif int(self.winner) != self.player:
-            reward = 1
-            return reward
-        else:
-            print("wtf")
+    @abstractmethod
+    def reward(self) -> float:
+        return 0.0
 
     @property
     def actions(self):
@@ -118,38 +115,21 @@ class TicTacToeNode(Node):
         return hash((self.board.data.tobytes(),self.player,self.winner))
 
 
-class TicTacMiniNode(Node):
-    def __init__(self,env: TicTacToe,board: np.array, player: int, winner = 0):
-        self.action = None
-        self.board = board
-        self.player = player
-        self.env = env
-        self.winner = winner
+class TicTacMCTSNode(TicTacToeNode):
+    def __init__(self, env: TicTacToe, board: np.array, player: int, winner=0):
+        super().__init__(env, TicTacMCTSNode, board, player, winner)
 
-    def find_random_child(self):
-        children = self.get_children()
-        random_child = np.random.choice(children, 1)[0]
-        assert type(random_child) == TicTacMiniNode
-        return random_child
+    def reward(self) -> float:
+        if self.winner == -1:
+            return 0.5
+        elif int(self.winner) != self.player:
+            reward = 1
+            return reward
 
-    def get_children(self):
 
-        valid_actions = self.env.actions(self.board)
-        curr_board = self.board.copy()
-        children = []
-        player = 2 if self.player == 1 else 1
-        for a in valid_actions:
-            next_board = self.env.next_state(curr_board,a, self.player)
-            r, winner = self.env.check_winner(next_board)
-            next_node = TicTacMiniNode(env=self.env, board=next_board, player=player, winner=winner)
-            children.append(next_node)
-        return children
-
-    def is_terminal(self):
-        return True if self.env.is_win(self.board) else False
-
-    def next_state(self,a):
-        return self.env.next_state(self.board,a,self.player)
+class TicTacMiniNode(TicTacToeNode):
+    def __init__(self, env: TicTacToe,board: np.array, player: int, winner=0):
+        super().__init__(env, TicTacMiniNode, board, player, winner)
 
     def reward(self,player):
         reward = 1
@@ -158,16 +138,6 @@ class TicTacMiniNode(Node):
         elif int(self.winner) != player:
             reward = -1
         return reward
-
-    @property
-    def actions(self):
-        return self.env.actions(self.board)
-
-    def __eq__(self, other):
-        return np.equal(other.board,self.board).all() and other.player == self.player and other.winner == self.winner
-
-    def __hash__(self):
-        return hash((self.board.data.tobytes(),self.player,self.winner))
 
 
 class TicTacToeMCTS(MCTS):
@@ -182,7 +152,7 @@ class TicTacToeMCTS(MCTS):
 
     def act(self,board,render=False):
 
-        s = TicTacToeNode(self._env,board,self._player,0)
+        s = TicTacMCTSNode(self._env,board,self._player,0)
         # First rum simulations to collect
         # Tree statistics
         for _ in range(self._num_sim):

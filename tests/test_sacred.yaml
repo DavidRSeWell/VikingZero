@@ -1,0 +1,17 @@
+---
+env: TicTacToe
+render: true
+iters: 10
+
+agent1:
+  agent: TicTacToeMinMax
+  player: 1
+  type: "alphabeta"
+
+agent2:
+  agent: TicTacToeMCTS
+  player: 2
+  n_sim: 50
+  c: 1
+
+

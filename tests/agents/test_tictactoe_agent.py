@@ -40,7 +40,7 @@ def test_designer():
     agent1_config = {
         'agent': TicTacToeMinMax,
         'player': 1,
-        'type': "minimax"
+        'type': "alphabeta"
     }
 
     agent2_config = {

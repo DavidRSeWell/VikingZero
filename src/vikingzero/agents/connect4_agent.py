@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 
+from abc import abstractmethod
 from collections import namedtuple
 
 from ..environments.connect4_env import Connect4
@@ -42,7 +43,7 @@ class Connect4MinMax(MINIMAX):
 
     def act(self,board):
 
-        s = Connect4Node(self._env,board,self._player)
+        s = Connect4MiniNode(self._env,board,self._player)
 
         a = self.run(s,type=self._type,d=self._d)
 
@@ -50,12 +51,15 @@ class Connect4MinMax(MINIMAX):
 
 
 class Connect4Node(Node):
-
-    def __init__(self,env: Connect4,board: np.array, player: int, winner = 0):
+    """
+    Base class. Dont use.
+    """
+    def __init__(self,env: Connect4,node_type,board: np.array, player: int, winner = 0):
 
         self.board = board
-        self.player = player
         self.env = env
+        self.node = node_type
+        self.player = player
         self.winner = winner
 
     def get_children(self):
@@ -70,7 +74,7 @@ class Connect4Node(Node):
             next_board = curr_board.copy()
             next_board[board_row,a] = self.player
             winner = self.env.check_winner(next_board)
-            next_node = Connect4Node(env=self.env,board=next_board,player=player,winner=winner)
+            next_node = self.node(env=self.env,board=next_board,player=player,winner=winner)
             children.append(next_node)
         return children
 
@@ -78,30 +82,49 @@ class Connect4Node(Node):
         "Random successor of this board state (for more efficient simulation)"
         children = self.get_children()
         random_child = np.random.choice(children, 1)[0]
-        assert type(random_child) == Connect4Node
+        assert type(random_child) == self.node
         return random_child
 
     def is_terminal(self):
         "Returns True if the node has no children"
         return True if self.env.check_winner(self.board) else False
 
+    @abstractmethod
     def reward(self):
-        "Assumes `self` is terminal node. 1=win, 0=loss, .5=tie, etc"
-        assert self.is_terminal()
-        if self.winner == -1:
-            # TODO
-            return 0.5
-        elif int(self.winner) != self.player:
-            reward = 1
-            return reward
-        else:
-            print("wtf")
+       pass
 
     def __eq__(self, other):
         return np.equal(other.board,self.board).all() and other.player == self.player and other.winner == self.winner
 
     def __hash__(self):
         return hash((self.board.data.tobytes(),self.player,self.winner))
+
+
+class Connect4MiniNode(Connect4Node):
+
+    def __init__(self,env: Connect4,board: np.array, player: int, winner = 0):
+        super().__init__(env,Connect4MiniNode,board,player, winner )
+
+    def reward(self, player):
+        reward = 1
+        if self.winner == -1:
+            return 0
+        elif int(self.winner) != player:
+            reward = -1
+        return reward
+
+
+class Connect4MCTSNode(Connect4Node):
+
+    def __init__(self, env: Connect4, board: np.array, player: int, winner=0):
+        super().__init__(env, Connect4MCTSNode,board, player, winner)
+
+    def reward(self) -> float:
+        if self.winner == -1:
+            return 0.5
+        elif int(self.winner) != self.player:
+            reward = 1
+            return reward
 
 
 class Connect4MCTS(MCTS):
@@ -116,7 +139,7 @@ class Connect4MCTS(MCTS):
 
     def act(self,board):
 
-        s = Connect4Node(self._env,board,self._player,0)
+        s = Connect4MCTSNode(self._env,board,self._player,0)
         # First rum simulations to collect
         # Tree statistics
         for _ in range(self._num_sim):
@@ -137,7 +160,7 @@ class Connect4MCTS(MCTS):
 
         children = self.children
 
-        values = [self._Q[c] / self._N[c] for c in children[s]]
+        values = [self.value(c) for c in children[s]]
 
         max_child = children[s][np.argmax(np.array(values))]
 
