@@ -57,7 +57,7 @@ class TicTacToeMinMax(MINIMAX):
 
     def act(self,board):
 
-        s = TicTacMiniNode(self._env,board,self._player)
+        s = TicTacMiniNode(self._env,board,self._env.current_player)
 
         a = self.run(s,type=self._type)
 
@@ -152,7 +152,7 @@ class TicTacToeMCTS(MCTS):
 
     def act(self,board,render=False):
 
-        s = TicTacMCTSNode(self._env,board,self._player,0)
+        s = TicTacMCTSNode(self._env,board,self._env.current_player,0)
         # First rum simulations to collect
         # Tree statistics
         for _ in range(self._num_sim):

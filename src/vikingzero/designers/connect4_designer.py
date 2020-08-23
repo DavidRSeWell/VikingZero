@@ -12,29 +12,6 @@ except:
     from vikingzero.agents.connect4_agent import RandomConnect4Agent, Connect4MCTS
     from vikingzero.environments.connect4_env import Connect4
 
-ex = Experiment('Connect4_Experiment')
-
-
-@ex.config
-def connect4_config():
-
-    env = Connect4()
-
-    iters = 500
-
-    agent1_config = {
-        'agent': Connect4MCTS,
-        'n_sim': 50,
-        'c': np.sqrt(2),
-        'player': 1
-    }
-
-    agent2_config = {
-        'agent': RandomConnect4Agent
-    }
-
-    render = False
-
 
 class Connect4Designer:
 
@@ -56,8 +33,8 @@ class Connect4Designer:
         :return: class
         """
         agent_config = agent_config.copy()
-        agent_name = agent_config['agent']
-        del agent_config['agent']
+        agent_name = agent_config["agent"]
+        del agent_config["agent"]
         Agent = load_agent(agent_name)
         agent = Agent(self.env, **agent_config)
         return agent
@@ -87,13 +64,13 @@ class Connect4Designer:
     def run(self,render=False,show_every=5):
 
         winners = {
-            '1':0, # player1
-            '2':0, # player2
-            '-1':0 # draw
+            "1":0, # player1
+            "2":0, # player2
+            "-1":0 # draw
         }
 
         for iter in range(self._iters):
-            print(f'Running iteration {iter}')
+            print(f"Running iteration {iter}")
 
             if (iter % show_every) == 0:
                 winner = self.play_game(render)
@@ -106,23 +83,122 @@ class Connect4Designer:
         print(winners)
 
 
-@ex.capture
-def run_ex(env,iters,agent1_config,agent2_config,render):
+class Designer:
 
-    designer = Connect4Designer(iters=iters,env=env,agent1_config=agent1_config,
-                                agent2_config=agent2_config)
-
-    designer.run(render=render)
+    def __init__(self,env,agent_config,exp_config,_run=False):
 
 
-@ex.main
-def main():
+        self._agent1_config = agent_config["agent1"]
+        self._agent2_config = agent_config["agent2"]
+        self._eval_iters = exp_config["eval_iters"]
+        self._iters = exp_config["episodes"]
+        self._record_every = exp_config["record_every"]
+        self._render = exp_config["render"]
+        self._run = _run
 
-    run_ex()
+        self.env = env
+        self.agent1 = self.load_agent(self._agent1_config)
+        self.agent2 = self.load_agent(self._agent2_config)
+
+    def load_agent(self,agent_config):
+        """
+        Instantiate an agent from its configuration
+        :param agent_config: dict
+        :return: class
+        """
+        agent_config = agent_config.copy()
+        agent_name = agent_config["agent"]
+        del agent_config["agent"]
+        Agent = load_agent(agent_name)
+        agent = Agent(self.env, **agent_config)
+        return agent
+
+    def play_game(self,render,agent1,agent2,iter=None):
+
+        self.env.reset()
+
+        curr_player = agent1
+
+        game_array = []
+
+        while True:
+
+            action = curr_player.act(self.env.board)
+
+            curr_state, action, next_state, r = self.env.step(action)
+
+            if render:
+                game_array.append(self.env.board.copy().tolist())
+                self.env.render()
+
+            if r != 0:
+                break
+
+            curr_player = agent2 if curr_player == agent1 else agent1
+
+        if render:
+            self._run.info[f"game_{iter}"] = game_array
+            #self._run.add_artifact(game_array)
+
+        return self.env.winner
+
+    def run(self):
+        """
+        :param _run: Used in conjunction with sacred for recording tests
+        :return:
+        """
+
+        winners = {
+            "1":0, # player1
+            "2":0, # player2
+            "-1":0 # draw
+        }
+
+        wins = []
+        draws = []
+
+        for iter in range(self._iters):
+            print(f"Running iteration {iter}")
+
+            if (iter % self._record_every) == 0:
+                r = self.run_eval(iter=iter)
+                #wins.append(w)
+                #draws.append(d)
+                self._run.log_scalar("tot_wins",r)
+
+            self.play_game(False,self.agent1,self.agent1)
+
+        '''
+        if self._run:
+            self._run.info["wins"] = wins
+            self._run.info["draws"] = draws
+        '''
 
 
-if __name__ == "__main__":
+    def run_eval(self,iter=None):
+        """
+        This method evaluates the current agent
+        :return:
+        """
+        result = 0
+        for i in range(self._eval_iters):
+            if i == 0:
+                winner = self.play_game(self._render,self.agent1,self.agent2,iter=iter)
+            else:
+                winner = self.play_game(False,self.agent1,self.agent2)
 
-    ex.run_commandline()
+            if winner == 2:
+                result -= 1
+            elif winner == 1:
+                result += 1
+
+        return result
+
+
+    def train(self,iters):
+
+         for _ in range(iters):
+             self.play_game(self._render,self.agent1,self.agent1)
+
 
 

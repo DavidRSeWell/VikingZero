@@ -1,28 +1,29 @@
 """A standard machine learning task using sacred's magic."""
 from sacred import Experiment
-from sacred.observers import FileStorageObserver
+from sacred.observers import FileStorageObserver,MongoObserver
 
 from vikingzero.utils import load_env
 from vikingzero.agents.tictactoe_agents import TicTacToeMCTS,TicTacToeMinMax
-from vikingzero.designers.connect4_designer import Connect4Designer
+from vikingzero.designers.connect4_designer import Connect4Designer,Designer
 from vikingzero.environments.tictactoe_env import TicTacToe
 
 ex = Experiment("tictactoe")
 
-ex.observers.append(FileStorageObserver("test_sacred"))
+#ex.observers.append(FileStorageObserver("test_sacred"))
+ex.observers.append(MongoObserver(url="localhost:27017",db_name="VikingZero"))
 
-ex.add_config("test_sacred.yaml")
+ex.add_config("test_tictactoe.yaml")
 
 
 @ex.capture
-def run_ex(env,iters,agent1,agent2,render):
+def run_ex(env,agent_config,exp_config,_run):
 
     env = load_env(env)()
 
-    designer = Connect4Designer(iters=iters,env=env,agent1_config=agent1,
-                                agent2_config=agent2)
+    designer = Designer(env,agent_config,exp_config,_run)
 
-    designer.run(render=render)
+    designer.run()
+
 
 
 @ex.main

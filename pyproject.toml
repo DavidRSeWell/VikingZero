@@ -17,6 +17,7 @@ torchvision = "^0.7.0"
 h5py = "^2.10.0"
 tables = "^3.6.1"
 PyYAML = "^5.3.1"
+pymongo = "^3.11.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"

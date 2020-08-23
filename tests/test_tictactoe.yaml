@@ -1,18 +1,20 @@
 ---
-env: "TicTacToe"
+env: TicTacToe
 
-agent-config:
-  agent1: "MCTS"
-    kind: "self-play" # the agent plays against itself
-    n-sim: 50
+agent_config:
+  agent1:
+    agent: TicTacToeMCTS
+    n_sim: 1
+    player: 1
     c: 1.41
 
-  agent2: "MiniMax"
-    kind: "nemesis"
-    type: "alphabeta"
-    depth: 2
+  agent2:
+    agent: TicTacToeMinMax
+    player: 2
+    type: "minimax"
 
-exp-config: # experiment config
-  episodes: 50
-  record-every: 5 # how often to record info
-  eval-iters: 5 # number of games to player during evaluation
+exp_config: # experiment config
+  episodes: 10
+  record_every: 1 # how often to record info
+  eval_iters: 5 # number of games to player during evaluation
+  render: true
