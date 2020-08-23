@@ -16,6 +16,7 @@ oracle_df = pd.read_hdf('/Users/befeltingu/Documents/GitHub/VikingZero/notebooks
 oracle_df['id'] = oracle_df['key']
 oracle_df.set_index('id', inplace=True, drop=False)
 
+
 class Component(ABC):
 
     def __init__(self):
