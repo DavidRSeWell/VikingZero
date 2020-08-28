@@ -1,0 +1,22 @@
+---
+env: Connect4
+
+agent_config:
+  agent1:
+    agent: Connect4MCTS
+    n_sim: 100
+    player: 1
+    c: 1.41
+
+  agent2:
+    agent: Connect4MinMax
+    player: 2
+    type: "alphabeta_depth"
+    depth: 3
+    n_sims: 5
+
+exp_config: # experiment config
+  episodes: 100
+  record_every: 10 # how often to record info
+  eval_iters: 3 # number of games to player during evaluation
+  render: true

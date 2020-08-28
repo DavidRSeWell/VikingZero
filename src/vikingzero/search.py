@@ -264,7 +264,7 @@ class MINIMAX:
                 best_score = v
                 best_action = child
 
-        print(vs)
+        #print(vs)
         return best_action
 
     def run(self,node,type="minimax",d=2,n=5):

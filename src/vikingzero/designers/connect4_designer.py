@@ -160,13 +160,14 @@ class Designer:
         for iter in range(self._iters):
             print(f"Running iteration {iter}")
 
-            if (iter % self._record_every) == 0:
+            if (iter % self._record_every) == 0 or (iter == self._iters - 1):
                 r = self.run_eval(iter=iter)
                 #wins.append(w)
                 #draws.append(d)
-                self._run.log_scalar("tot_wins",r)
+                self._run.log_scalar(r"tot_wins",r)
 
             self.play_game(False,self.agent1,self.agent1)
+
 
         '''
         if self._run:
@@ -185,7 +186,7 @@ class Designer:
             if i == 0:
                 winner = self.play_game(self._render,self.agent1,self.agent2,iter=iter)
             else:
-                winner = self.play_game(False,self.agent1,self.agent2)
+                winner = self.play_game(self._render,self.agent1,self.agent2)
 
             if winner == 2:
                 result -= 1

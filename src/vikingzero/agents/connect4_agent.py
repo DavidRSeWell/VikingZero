@@ -32,12 +32,13 @@ class RandomConnect4Agent:
 
 class Connect4MinMax(MINIMAX):
 
-    def __init__(self,env: Connect4,player = 1,type="minimax",depth=2):
+    def __init__(self,env: Connect4,player = 1,type="minimax",depth=2,n_sims=1):
         super().__init__()
 
         print(f"Loading MINMAX agent with type = {type}")
         self._env = env
         self._d = depth
+        self._n = n_sims
         self._player = player
         self._type = type
 
@@ -45,7 +46,7 @@ class Connect4MinMax(MINIMAX):
 
         s = Connect4MiniNode(self._env,board,self._player)
 
-        a = self.run(s,type=self._type,d=self._d)
+        a = self.run(s,type=self._type,d=self._d,n=self._n)
 
         return a
 
