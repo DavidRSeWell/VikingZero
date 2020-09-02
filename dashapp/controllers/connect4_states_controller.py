@@ -32,24 +32,7 @@ class Controller:
         :param app:
         :return:
         """
-        '''
-        @app.callback(Output("connect4state_main", "children"), [Input("fetch_board", "n_clicks")])
-        def fetch_board(n_clicks):
-
-            print("Fetch baord")
-            # fetch board
-            board = np.array([
-                [0, 0, 0, 0, 0, 0, 0],
-                [0, 0, 0, 0, 0, 0, 0],
-                [0, 0, 0, 0, 0, 0, 0],
-                [0, 0, 0, 1, 0, 0, 0],
-                [0, 0, 0, 2, 0, 0, 0],
-                [0, 0, 2, 1, 0, 0, 0],
-            ])
-
-            connect4_baord = Connect4Board(board)
-
-            return connect4_baord.layout
+        ''' 
         '''
 
         @app.callback(

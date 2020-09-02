@@ -46,7 +46,6 @@ class Connect4Board(Component):
     @property
     def layout(self):
 
-
         if len(self._board.shape) == 2:
             bs = self.display_board(self._board.flatten())
         else:

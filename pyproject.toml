@@ -20,6 +20,7 @@ PyYAML = "^5.3.1"
 pymongo = "^3.11.0"
 qtmodern = "^0.2.0"
 pyqtgraph = "^0.11.0"
+PyQtWebEngine = "^5.15.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"

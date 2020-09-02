@@ -1,37 +1,65 @@
 import dash_html_components as html
-import dash_core_components as dcc
 import dash_bootstrap_components as dbc
+import dash_core_components as dcc
 
 try:
-    from ..components.connect4 import Connect4Board,OracleTable
+    from ..controllers.sacred_controller import SacredController
+    from ..components.sacred import SacredExp
 except:
-    from components.connect4 import Connect4Board,OracleTable
+    from controllers.sacred_controller import SacredController
+    from components.sacred import SacredExp
+
+
+tabs_styles = {
+    'height': '44px'
+}
+
+tab_style = {
+    'borderBottom': '1px solid #d6d6d6',
+    'padding': '6px',
+    'fontWeight': 'bold'
+}
+
+tab_selected_style = {
+    'borderTop': '1px solid #d6d6d6',
+    'borderBottom': '1px solid #d6d6d6',
+    'backgroundColor': '#119DFF',
+    'color': 'white',
+    'padding': '6px'
+}
 
 
 class SacredExpPage:
 
-    def __init__(self,app):
+    def __init__(self,app,db):
         self._app = app
+        self._db = db
+        self._current_exp = None
+        self.controller = SacredController(self._db)
+        self.controller.register_callbacks(self._app)
+        self._exp = self.controller.exps_list_group
 
     @property
     def layout(self):
 
         comp = dbc.Container([
-            html.H1("Board"),
+            dcc.Store("exp_id"),
+            html.H1("Experiments"),
             html.Hr(),
-            dbc.Row(
-                [
-
+            dbc.Row([
+                dbc.Col(self._exp,width=3,id="exp_list"),
+                dbc.Col([
+                      html.Div([
+                        dcc.Tabs(id="exp-tabs", value='tab-info', children=[
+                            dcc.Tab(label='info', value='tab-info', style=tab_style, selected_style=tab_selected_style),
+                            dcc.Tab(label='plots', value='tab-plots', style=tab_style, selected_style=tab_selected_style),
+                            dcc.Tab(label='games', value='tab-games', style=tab_style, selected_style=tab_selected_style),
+                        ], style=tabs_styles)]
+                    ),
+                    dbc.Row(
+                        [],id="exp_panel")
                 ],
-                align="center",
-                id="connect4state_main"),
-            dbc.Row(
-                [
-                    dbc.Button("test",id="fetch_board",color="primary")
-                ]
-            ),
-
-            dbc.Row([self._oracle_table.layout()],id="oracle-table-row")
+                width=9)
+            ])
         ])
-
         return comp
