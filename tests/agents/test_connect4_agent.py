@@ -1,7 +1,8 @@
+import numpy as np
 
-from src.agents.connect4_agent import RandomConnect4Agent
-from src.designer.connect4_designer import Connect4Designer
-from src.environments.connect4_env import Connect4
+from vikingzero.agents.connect4_agent import RandomConnect4Agent,Connect4MinMax,Connect4MCTS
+from vikingzero.designers.connect4_designer import Connect4Designer
+from vikingzero.environments.connect4_env import Connect4
 
 
 def test_random_agent():
@@ -37,19 +38,27 @@ def test_designer():
     env = Connect4()
 
     agent1_config = {
-        'agent': RandomConnect4Agent
+        "agent": Connect4MCTS,
+        "player": 1,
+        "c": np.sqrt(2),
+        "n_sim": 200
+        # "type": "alphabeta_depth"
     }
-
     agent2_config = {
-        'agent': RandomConnect4Agent
+        "agent": Connect4MinMax,
+        "player":2,
+        "type":"alphabeta_depth",
+        "depth":2
     }
 
-    designer = Connect4Designer(iters=1000,env=env
+
+
+    designer = Connect4Designer(iters=50,env=env
                                 ,agent1_config=agent1_config
                                 ,agent2_config=agent2_config
                                 )
 
-    designer.run()
+    designer.run(render=True)
 
 
 
