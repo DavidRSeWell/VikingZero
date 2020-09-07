@@ -6,6 +6,9 @@ import pandas as pd
 import plotly.express as px
 
 
+from .connect4 import Connect4Board
+
+
 class SacredExp:
 
     def __init__(self,exp):
@@ -14,6 +17,26 @@ class SacredExp:
         self.graph = self.load_graph()
         self.games = self.load_games()
         self.info = self.load_info()
+
+    def game_panel(self,game_id=0,move_id=0):
+        game = self._exp.games[f"game_{game_id}"]
+        game = np.array(game)
+        board = game[move_id]
+        if self._exp.env.lower() == "tictactoe":
+            board = board.reshape((3,3))
+
+        board_comp = Connect4Board(board)
+
+        panel = dbc.Row([
+
+                dbc.Col(self.games,width=2),
+                dbc.Col([html.Div(html.H2(f"Game={game_id} MoveID = {move_id}")),
+                     html.Div(board_comp.layout),dbc.Button("Prev","game_prev"),
+                     dbc.Button("Next",id="game_next")],width=10)
+            ]
+        )
+
+        return panel
 
     def load_graph(self):
 
@@ -56,53 +79,7 @@ class SacredExp:
         agent_config = config_info["agent_config"]
 
         return html.Div(str(config_info))
-        """ 
-        input_groups = html.Div(
-            [
-                dbc.InputGroup(
-                    [
-                        dbc.InputGroupAddon("", addon_type="prepend"),
-                        dbc.Input(placeholder="Username"),
-                    ],
-                    className="mb-3",
-                ),
-                dbc.InputGroup(
-                    [
-                        dbc.Input(placeholder="Recipient's username"),
-                        dbc.InputGroupAddon("@example.com", addon_type="append"),
-                    ],
-                    className="mb-3",
-                ),
-                dbc.InputGroup(
-                    [
-                        dbc.InputGroupAddon("$", addon_type="prepend"),
-                        dbc.Input(placeholder="Amount", type="number"),
-                        dbc.InputGroupAddon(".00", addon_type="append"),
-                    ],
-                    className="mb-3",
-                ),
-                dbc.InputGroup(
-                    [
-                        dbc.InputGroupAddon("With textarea", addon_type="prepend"),
-                        dbc.Textarea(),
-                    ],
-                    className="mb-3",
-                ),
-                dbc.InputGroup(
-                    [
-                        dbc.Select(
-                            options=[
-                                {"label": "Option 1", "value": 1},
-                                {"label": "Option 2", "value": 2},
-                            ]
-                        ),
-                        dbc.InputGroupAddon("With select", addon_type="append"),
-                    ]
-                ),
-            ]
-        )
-        
-        return input_groups
-        """
+
+
 
 

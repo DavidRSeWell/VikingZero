@@ -42,12 +42,13 @@ class SacredExpPage:
     @property
     def layout(self):
 
-        comp = dbc.Container([
+        comp = html.Div([
             dcc.Store("exp_id"),
+            dcc.Store("game_info"),
             html.H1("Experiments"),
             html.Hr(),
             dbc.Row([
-                dbc.Col(self._exp,width=3,id="exp_list"),
+                dbc.Col(self._exp,width=2,id="exp_list"),
                 dbc.Col([
                       html.Div([
                         dcc.Tabs(id="exp-tabs", value='tab-info', children=[
@@ -56,10 +57,12 @@ class SacredExpPage:
                             dcc.Tab(label='games', value='tab-games', style=tab_style, selected_style=tab_selected_style),
                         ], style=tabs_styles)]
                     ),
-                    dbc.Row(
+                    html.Div(
                         [],id="exp_panel")
                 ],
-                width=9)
+                width=10)
             ])
         ])
         return comp
+
+

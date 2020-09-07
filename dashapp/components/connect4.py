@@ -46,10 +46,13 @@ class Connect4Board(Component):
     @property
     def layout(self):
 
+        row= self._board.shape[0]
+        col= self._board.shape[1]
+
         if len(self._board.shape) == 2:
-            bs = self.display_board(self._board.flatten())
+            bs = self.display_board(self._board.flatten(),col,row)
         else:
-            bs = self.display_board(self._board)
+            bs = self.display_board(self._board,columns=3,rows=3)
 
         comp = dcc.Textarea(
                 id='connect4_board',
@@ -60,9 +63,7 @@ class Connect4Board(Component):
         return comp
 
     @staticmethod
-    def display_board(board):
-        columns = 7
-        rows = 6
+    def display_board(board,columns= 7, rows = 6):
 
         board = board.astype(np.int)
 

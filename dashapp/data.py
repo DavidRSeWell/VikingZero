@@ -29,7 +29,6 @@ class SacredDB:
         self._port = port
 
     def load(self,id):
-        print(f"Load func id = {id}")
         runs = self._db.runs
         metrics = self._db.metrics
         exp = runs.find({"_id":id})[0]
