@@ -87,14 +87,14 @@ class Designer:
 
     def __init__(self,env,agent_config,exp_config,_run=False):
 
-
         self._agent1_config = agent_config["agent1"]
         self._agent2_config = agent_config["agent2"]
         self._eval_iters = exp_config["eval_iters"]
         self._iters = exp_config["episodes"]
+        self._record_all = exp_config["record_all"]
         self._record_every = exp_config["record_every"]
         self._render = exp_config["render"]
-        self._run = _run
+        self._run = _run # Comes from sacred library to track the run
 
         self.env = env
         self.agent1 = self.load_agent(self._agent1_config)
@@ -125,6 +125,11 @@ class Designer:
 
             action = curr_player.act(self.env.board)
 
+            if self._record_all:
+                curr_board = self.env.board.copy()
+                b_hash = hash((curr_board.tobytes(),))
+                self._run.info[f"action_iter={iter}_{b_hash}"] = (curr_board.tolist(),int(action))
+
             curr_state, action, next_state, r = self.env.step(action)
 
             if render:
@@ -132,13 +137,14 @@ class Designer:
                 self.env.render()
 
             if r != 0:
+                if self._record_all:
+                    self._run.info[f"game_{iter}_result"] = r
                 break
 
             curr_player = agent2 if curr_player == agent1 else agent1
 
         if render:
             self._run.info[f"game_{iter}"] = game_array
-            #self._run.add_artifact(game_array)
 
         return self.env.winner
 
@@ -148,33 +154,17 @@ class Designer:
         :return:
         """
 
-        winners = {
-            "1":0, # player1
-            "2":0, # player2
-            "-1":0 # draw
-        }
-
-        wins = []
-        draws = []
-
         for iter in range(self._iters):
             print(f"Running iteration {iter}")
 
             if (iter % self._record_every) == 0 or (iter == self._iters - 1):
+
                 r = self.run_eval(iter=iter)
-                #wins.append(w)
-                #draws.append(d)
+
                 self._run.log_scalar(r"tot_wins",r)
 
-            self.play_game(False,self.agent1,self.agent1)
-
-
-        '''
-        if self._run:
-            self._run.info["wins"] = wins
-            self._run.info["draws"] = draws
-        '''
-
+            #TODO Allow for self-play as a setting
+            self.play_game(False,self.agent1,self.agent2,iter)
 
     def run_eval(self,iter=None):
         """
@@ -194,7 +184,6 @@ class Designer:
                 result += 1
 
         return result
-
 
     def train(self,iters):
 

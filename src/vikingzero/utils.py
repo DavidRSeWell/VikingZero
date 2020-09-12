@@ -8,6 +8,9 @@ def load_agent(name):
     elif "connect4" in name.lower():
         module_name += ".connect4_agent"
 
+    elif "zero" in name.lower():
+        module_name += ".alphago"
+
     print(f"Loading agent {name}")
     mod = __import__(module_name, fromlist=[name])
     klass = getattr(mod, name)

@@ -6,6 +6,7 @@ https://gist.github.com/qpwo/c538c6f73727e254fdc7fab81024f6e1
 
 from abc import ABC,abstractmethod
 from collections import defaultdict
+from operator import itemgetter
 
 import numpy as np
 
@@ -20,6 +21,7 @@ class MCTS:
         """
         self._Q = defaultdict(int)
         self._N = defaultdict(int)
+        self._W = defaultdict(int) # For AlphaGo usage only
 
         self.c = c # exploratory parameter
         self.children = dict()
@@ -36,9 +38,8 @@ class MCTS:
         winner,r = reward
         for node in reversed(path):
             self._N[node] += 1
-            if node.player != winner:
+            if node.player != winner: # this only works if losing is 0 loss
                 self._Q[node] += r
-            #reward = 1 - reward  # 1 for me is 0 for my enemy, and vice versa
 
     def expand(self,node):
         """
@@ -57,7 +58,7 @@ class MCTS:
         based on some simulate mechanism. Could be rollout or could be a NN
         :return:
         """
-        #player = node.player
+
         while True:
             if node.is_terminal():
                 reward = node.reward()
@@ -167,7 +168,15 @@ class MINIMAX:
         for child in node.get_children():
             values.append(min_value(child))
 
-        return max(node.get_children(), key=lambda child: min_value(child))
+        v = [(child,min_value(child)) for child in node.get_children()]
+
+        max_c = max(v,key=itemgetter(1))
+
+        all_maxes = [child[0] for child in v if child[1] == max_c[1]]
+
+        #max(node.get_children(), key=lambda child: min_value(child))
+
+        return np.random.choice(all_maxes)
 
     def alpha_beta(self,node):
 
@@ -207,13 +216,22 @@ class MINIMAX:
         best_score = -np.inf
         beta = np.inf
         best_action = None
+        res = []
         for child in node.get_children():
             v = min_value(child, best_score, beta)
-            if v > best_score:
-                best_score = v
-                best_action = child
+            #if v == best_score:
+            #    best_action.append(child)
+            #    continue
 
-        return best_action
+            res.append((child,v))
+            continue
+
+
+        max_c = max(res,key=itemgetter(1))
+
+        all_maxes = [child[0] for child in res if child[1] == max_c[1]]
+
+        return np.random.choice(all_maxes)
 
     def alpha_beta_depth(self,node,cutoff_test=None,n=5):
 
@@ -269,8 +287,10 @@ class MINIMAX:
 
     def run(self,node,type="minimax",d=2,n=5):
 
-        if node in self.children:
-            return self.policy[node]
+        if 1 == 0:
+            pass
+        #if node in self.children:
+        #    return self.policy[node]
 
         else:
 

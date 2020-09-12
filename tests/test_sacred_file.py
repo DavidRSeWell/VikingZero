@@ -7,12 +7,12 @@ from vikingzero.agents.tictactoe_agents import TicTacToeMCTS,TicTacToeMinMax
 from vikingzero.designers.connect4_designer import Connect4Designer,Designer
 from vikingzero.environments.tictactoe_env import TicTacToe
 
-ex = Experiment("connect4")
+ex = Experiment("tictactoe")
 
 #ex.observers.append(FileStorageObserver("test_sacred"))
 ex.observers.append(MongoObserver(url="localhost:27017",db_name="VikingZero"))
 
-ex.add_config("connect4.yaml")
+ex.add_config("test_tictactoe.yaml")
 
 
 @ex.capture
@@ -23,7 +23,6 @@ def run_ex(env,agent_config,exp_config,_run):
     designer = Designer(env,agent_config,exp_config,_run)
 
     designer.run()
-
 
 
 @ex.main

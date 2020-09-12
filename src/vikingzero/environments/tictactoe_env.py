@@ -146,6 +146,21 @@ class TicTacToe:
             return (0,0) , winner
 
     @staticmethod
+    def check_turn(board):
+        """
+        Check whos turn it is to act
+        :param board:
+        :return:
+        """
+        count_1 = len(np.where(board.flatten() == 1)[0])
+        count_2 = len(np.where(board.flatten() == 2)[0])
+
+        if count_1 > count_2:
+            return 2
+        else:
+            return 1
+
+    @staticmethod
     def is_draw(board):
 
         zero_count = len(np.where(board == 0)[0])
