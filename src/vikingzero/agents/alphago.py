@@ -3,6 +3,7 @@ import numpy as np
 import random
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from collections import namedtuple
 from dataclasses import dataclass
@@ -25,6 +26,7 @@ class Memory:
 
 
 class Network(nn.Module):
+
     def __init__(self):
         super().__init__()
 
@@ -35,7 +37,7 @@ class Network(nn.Module):
 
         # Set up the different heads
         # Each head can take any network configuration
-        self.policy = nn.Softmax(dim=1)
+        self.policy = nn.Linear(9 , 9)
         self.value = nn.Linear(9, 1)
 
     def forward(self, x):
@@ -44,10 +46,10 @@ class Network(nn.Module):
         x = self.shared_layer(x)
 
         # Run the different heads with the output of the shared layers as input
-        policy_out = self.policy(x)
+        policy_out = F.log_softmax(self.policy(x), dim=1)
         value_out = self.value(x)
 
-        return policy_out, float(value_out)
+        return policy_out, value_out
 
 
 class ReplayMemory(object):
@@ -57,11 +59,11 @@ class ReplayMemory(object):
         self.memory = []
         self.position = 0
 
-    def push(self, *args):
+    def push(self, mem):
         """Saves a transition."""
         if len(self.memory) < self.capacity:
             self.memory.append(None)
-        self.memory[self.position] = Memory(*args)
+        self.memory[self.position] = mem
         self.position = (self.position + 1) % self.capacity
 
     def sample(self, batch_size):
@@ -73,19 +75,23 @@ class ReplayMemory(object):
 
 class AlphaZero(MCTS):
 
-    def __init__(self,env,node, n_sim: int = 50, batch_size=100, c: int = 1,
+    def __init__(self,env,node, n_sim: int = 50, batch_size=10, c: int = 1,
                  player: int = 1):
         super().__init__(c)
 
+        self._action_size = 9
         self._batch_size = batch_size
         self._current_memory = [] # hold memory for current game
         self._env = env
         self._memory = self.create_memory()
         self._nn = self.create_model()
         self._n_sim = n_sim
+        self._optimizer = torch.optim.Adam(self._nn.parameters())
         self._player = player
         self._softmax = torch.nn.Softmax(dim=1)
         self._tau = 1
+
+        self._v_loss = torch.nn.MSELoss(reduction='sum')
 
         self._Node = node
 
@@ -100,11 +106,14 @@ class AlphaZero(MCTS):
 
         a,p_a = self.get_action(s)
 
-        board = Variable(torch.from_numpy(s.board).type(dtype=torch.float))
+        if len(board.shape) == 1:
+            board = board.reshape((1, board.shape[0]))
 
-        p, v = self._nn(board)
+        board = Variable(torch.from_numpy(board).type(dtype=torch.float))
 
-        memory = Memory(board,p_a,p,v,None)
+        #p, v = self._nn(board)
+
+        memory = Memory(board,None,p_a,None,None)
 
         self._current_memory.append(memory)
 
@@ -117,17 +126,26 @@ class AlphaZero(MCTS):
         :return:
         """
 
+        #TODO Optim
         temp_power = 1.0 / self._tau
 
         children = self.children[s]
 
-        c_counts = [self._N[c]**temp_power for c in children]
+        actions = [self.get_parent_action(s,c) for c in children]
+
+        c_counts = np.array([self._N[c]**temp_power for c in children])
 
         c_sum = sum(c_counts)
 
         p_a = c_counts / c_sum
 
-        return np.random.choice(children,p_a) , p_a
+        child_act =np.random.choice(children,p=p_a)
+
+        p = np.zeros(self._action_size)
+
+        p[actions] = p_a
+
+        return self.get_parent_action(s,child_act), p
 
     def get_parent_action(self,parent,child):
 
@@ -155,13 +173,15 @@ class AlphaZero(MCTS):
 
         p , v = self._nn(board)
 
+        p = p.reshape(self._action_size)
+
         N_p = self._N[node]
 
         child_v = []
         for child in children:
             a = self.get_parent_action(node, child)
             p_a = p[a]
-            u_c = self._Q[child] + self.c * p_a * (np.sqrt(N_p) / (1 + self._N[child]))
+            u_c = self._Q[child] / self._N[child]+ self.c * p_a * (np.sqrt(N_p) / (1 + self._N[child]))
             child_v.append((child, u_c))
 
         # return max(self.children[node], key=uct)
@@ -177,7 +197,7 @@ class AlphaZero(MCTS):
 
         p,v = self._nn(board)
 
-        return v
+        return (node.winner,float(v))
 
     def store_memory(self,z):
         """
@@ -185,9 +205,10 @@ class AlphaZero(MCTS):
         :param z:
         :return:
         """
+        #z = torch.IntTensor(z)
         for mem in self._current_memory:
 
-            p_turn = self._env.check_turn(mem.board)
+            p_turn = self._env.check_turn(mem.state)
 
             if p_turn != z: # if winner != player of node
                 mem.z = 1
@@ -203,11 +224,34 @@ class AlphaZero(MCTS):
 
         data = self._memory.sample(self._batch_size)
 
+        for d in data:
+
+
+            target = torch.FloatTensor(d.action_mcts.reshape(self._action_size))
+
+            p, v = self._nn(d.state)
+            loss_value = (d.z - v)** 2
+            loss_policy = self.loss_pi(target, p)
+
+            loss = loss_value + loss_policy #loss_policy
+            self._optimizer.zero_grad()
+            loss.backward()
+            self._optimizer.step()
+
     def create_model(self):
         return Network()
 
     def create_memory(self):
-        return ReplayMemory(10^9)
+        return ReplayMemory(10000)
+
+    def loss_pi(self, targets, outputs):
+        return -torch.sum(targets * outputs) / targets.size()[0]
+
+    def loss_v(self, targets, outputs):
+
+        #return torch.sum((targets - outputs) ** 2)
+        #return torch.sum((targets - outputs.view(-1)) ** 2) / targets.size()[0]
+        pass
 
 
 class DesignerZero(Designer):
@@ -218,6 +262,7 @@ class DesignerZero(Designer):
         self._train_iters = exp_config["train_iters"]
         self.current_best = self.load_agent(self._agent1_config)
         self.current_player = copy.deepcopy(self.current_best)
+
 
     def run(self):
         """
@@ -255,4 +300,4 @@ class DesignerZero(Designer):
 
             z = self.play_game(self._render,self.current_player,self.current_player)
 
-            self.current_player.update_memory(z)
+            self.current_player.store_memory(z)

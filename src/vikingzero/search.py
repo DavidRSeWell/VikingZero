@@ -21,7 +21,6 @@ class MCTS:
         """
         self._Q = defaultdict(int)
         self._N = defaultdict(int)
-        self._W = defaultdict(int) # For AlphaGo usage only
 
         self.c = c # exploratory parameter
         self.children = dict()

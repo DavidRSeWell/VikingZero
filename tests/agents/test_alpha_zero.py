@@ -13,7 +13,7 @@ def test_alphago_zero():
             "agent": "AlphaZero",
             "node": TicTacMCTSNode,
             "n_sim":50,
-            "batch_size": 100,
+            "batch_size": 5,
             "c": 1.41,
             "player":1
         },
@@ -23,7 +23,7 @@ def test_alphago_zero():
             "agent": "AlphaZero",
             "node": TicTacMCTSNode,
             "n_sim": 50,
-            "batch_size": 100,
+            "batch_size": 5,
             "c": 1.41,
             "player": 1
         },
@@ -36,7 +36,7 @@ def test_alphago_zero():
         "record_every": 1,
         "eval_iters": 1,
         "render":False,
-        "train_iters": 100
+        "train_iters": 2
     }
 
     designer = DesignerZero(TicTacToe(),agent_config,exp_config,_run=False)
