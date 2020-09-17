@@ -36,42 +36,46 @@ def test_random_agent(render=True,seed=3):
 
 def test_designer():
 
-    env = TicTacToe()
 
-    agent1_config = {
-        'agent': TicTacToeMCTS_NN,
-        'player': 1,
-        'n_sim': 5,
-        'c':1.41,
-        'nn_path':'/Users/befeltingu/Documents/Github/VikingZero/notebooks/data/tic_expert'
+    agent_config = {
 
+        "agent1": {
+
+            "agent": "TicTacToeMinMax",
+            #"node": TicTacMCTSNode,
+            #"n_sim": 50,
+            #"batch_size": 15,
+            #"c": 1.41,
+            "player": 1,
+            "type": "minimax"
+        },
+
+        "agent2": {
+
+            "agent": "TicTacToeMinMax",
+            # "node": TicTacMiniNode,
+            # "n_sim": 50,
+            # "batch_size": 5,
+            # "c": 1.41,
+            "player": 2,
+            "type": "minimax"
+        },
 
     }
 
-    agent2_config = {
-        'agent': TicTacToeMinMax,
-        'player':2,
-        #'n_sim': 50,
-        #'c': 1
-        'type':"minimax"
+    exp_config = {
+        "episodes": 10,
+        "record_all": False,
+        "record_every": 1,
+        "eval_iters": 1,
+        "render": True,
+        "train_iters": 5
     }
 
 
-    #agent2_config = {
-    #    'agent': RandomTicTacToeAgent,
-        #'player': 2
-    #}
+    designer = Designer(TicTacToe(),agent_config,exp_config,_run=False)
 
-
-
-
-
-    designer = Designer(env=env
-                                ,agent1_config=agent1_config
-                                ,agent2_config=agent2_config
-                                )
-
-    designer.run(render=True)
+    designer.play_game(True,designer.agent1,designer.agent2)
 
 
 if __name__ == "__main__":

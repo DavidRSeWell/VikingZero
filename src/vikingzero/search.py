@@ -39,6 +39,8 @@ class MCTS:
             self._N[node] += 1
             if node.player != winner: # this only works if losing is 0 loss
                 self._Q[node] += r
+            else:
+                self._Q[node] -= r
 
     def expand(self,node):
         """

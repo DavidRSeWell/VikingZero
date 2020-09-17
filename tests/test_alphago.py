@@ -3,21 +3,22 @@ from sacred import Experiment
 from sacred.observers import MongoObserver
 
 from vikingzero.utils import load_env
-from vikingzero.designers.connect4_designer import Designer
+from vikingzero.agents.alphago import AlphaZero,DesignerZero
 
-ex = Experiment("tictactoe")
+ex = Experiment("AlphaGoZero")
 
 ex.observers.append(MongoObserver(url="localhost:27017",db_name="VikingZero"))
 
-ex.add_config("test_tictactoe.yaml")
+ex.add_config("test_alphago.yaml")
 
+ex.captured_out_filter = lambda text: 'Output capturing turned off.'
 
 @ex.capture
 def run_ex(env,agent_config,exp_config,_run):
 
     env = load_env(env)()
 
-    designer = Designer(env,agent_config,exp_config,_run)
+    designer = DesignerZero(env,agent_config,exp_config,_run)
 
     designer.run()
 

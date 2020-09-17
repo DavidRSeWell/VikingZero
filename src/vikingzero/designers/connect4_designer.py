@@ -145,6 +145,7 @@ class Designer:
 
         if render:
             self._run.info[f"game_{iter}"] = game_array
+            pass
 
         return self.env.winner
 
@@ -189,6 +190,5 @@ class Designer:
 
          for _ in range(iters):
              self.play_game(self._render,self.agent1,self.agent1)
-
 
 

@@ -25,11 +25,12 @@ class TicTacToe:
             #self.board = np.array(board).flatten()
 
             self.board[0] = 1
-            self.board[1] = 1
+            #self.board[1] = 2
             self.board[2] = 2
+            #self.board[3] = 1
             self.board[4] = 2
-            self.board[7] = 1
-            self.board[8] = 2
+            self.board[5] = 1
+            self.board[8] = 1
 
         #run_test()
 
@@ -76,11 +77,12 @@ class TicTacToe:
 
             #self.board = np.array(board).flatten()
             self.board[0] = 1
-            self.board[1] = 1
+            # self.board[1] = 2
             self.board[2] = 2
+            # self.board[3] = 1
             self.board[4] = 2
-            # self.board[7] = 1
-            # self.board[8] = 2
+            self.board[5] = 1
+            self.board[8] = 1
 
         #run_test()
 

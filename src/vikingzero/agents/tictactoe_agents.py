@@ -146,11 +146,15 @@ class TicTacMCTSNode(TicTacToeNode):
 
     def reward(self) -> float:
         if self.winner == -1:
-            return 0.5
+            return 0
+        else:
+            return 1
+        """ 
         elif int(self.winner) != self.player:
-            reward = 1
-            return reward
-
+            return 1
+        elif int(self.winner) == self.player:
+            return -1
+        """
 
 class TicTacMiniNode(TicTacToeNode):
     def __init__(self, env: TicTacToe,board: np.array, player: int, winner=0):

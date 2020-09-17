@@ -7,25 +7,24 @@ agent_config:
     #player: 1
     #type: "alphabeta"
     agent: TicTacToeMCTS
-    n_sim: 5
+    n_sim: 15
     player: 1
-    c: 1.95
+    c: 1.41
     #type: "minimax"
     #nn_path: '/Users/befeltingu/Documents/Github/VikingZero/notebooks/data/tic_expert'
 
   agent2:
-    #agent: TicTacToeMinMax
-    #player: 2
-    #type: "alphabeta"
-    agent: TicTacToeMCTS
-    n_sim: 5
+    agent: TicTacToeMinMax
     player: 2
-    c: 1.95
-    #type: "minimax"
+    type: "minimax"
+    #agent: TicTacToeMCTS
+    #n_sim: 5
+    #player: 2
+    #c: 1.95
     #nn_path: '/Users/befeltingu/Documents/Github/VikingZero/notebooks/data/tic_expert'
 
 exp_config: # experiment config
-  episodes: 100
+  episodes: 50
   record_all: true
   record_every: 1 # how often to record info
   eval_iters: 1 # number of games to player during evaluation
