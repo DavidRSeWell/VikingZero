@@ -14,6 +14,8 @@ class Connect4(gym.Env):
 
         self.current_player = 1
 
+        self.name = "Connect4"
+
         self.winner = None
 
     def close(self):

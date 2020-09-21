@@ -16,6 +16,7 @@ class TicTacToe:
         self._display_board = display_board
         self.current_player = 1
         self.board = np.zeros(9,)
+        self.name = "TicTacToe"
 
         def run_test():
             board = [[2., 2., 1.],

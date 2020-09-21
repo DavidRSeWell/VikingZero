@@ -14,6 +14,7 @@ from torch.autograd import Variable
 from ..search import MCTS
 from ..designers.connect4_designer import Designer
 from ..agents.tictactoe_agents import TicTacMCTSNode
+from ..agents.connect4_agent import Connect4MCTSNode
 
 Memory = namedtuple('Transition',
                         ('state', 'action', 'action_dist', 'value', 'z'))
@@ -29,21 +30,23 @@ class Memory:
 
 class Network(nn.Module):
 
-    def __init__(self):
+    def __init__(self,input_size,output_size):
         super().__init__()
 
+        self._input_size = input_size
+        self._output_size = output_size
         # This represents the shared layer(s) before the different heads
         # Here, I used a single linear layer for simplicity purposes
         # But any network configuration should work
-        self.h1 = nn.Linear(9, 18)
-        self.h2 = nn.Linear(18, 18)
-        self.h3 = nn.Linear(18, 9)
+        self.h1 = nn.Linear(input_size, input_size*2)
+        self.h2 = nn.Linear(input_size*2, input_size*2)
+        self.h3 = nn.Linear(input_size*2, input_size)
         #self.h4 = nn.Linear(18, 9)
 
         # Set up the different heads
         # Each head can take any network configuration
-        self.policy = nn.Linear(9 , 9)
-        self.value = nn.Linear(9, 1)
+        self.policy = nn.Linear(input_size , output_size)
+        self.value = nn.Linear(input_size, 1)
 
     def forward(self, x):
 
@@ -97,13 +100,13 @@ class ReplayMemory(object):
 class AlphaZero(MCTS):
 
     def __init__(self,env, n_sim: int = 50, batch_size: int = 10,max_mem_size: int = 1000,
-                 epochs: int = 10, c: int = 1, lr: float = 0.001,
-                 player: int = 1):
+                 epochs: int = 10, c: int = 1, lr: float = 0.001,input_size: int = 9, output_size: int = 9,
+                 player: int = 1,momentum: float = 0.9,optimizer: str = "Adam"):
         super().__init__(c)
 
         self.player = player
 
-        self._action_size = 9
+        self._action_size = output_size
         self._act_max = False
         self._batch_size = batch_size
         self._current_memory = [] # hold memory for current game
@@ -111,16 +114,25 @@ class AlphaZero(MCTS):
         self._epochs = epochs
         self._max_mem_size = max_mem_size
         self._memory = self.create_memory()
-        self._nn = self.create_model()
+        self._nn = self.create_model(input_size,output_size)
         self._n_sim = n_sim
-        self._optimizer = torch.optim.Adam(self._nn.parameters(),lr=lr)
-        #self._optimizer = torch.optim.SGD(self._nn.parameters(),lr=0.01,momentum=0.9)
+        if optimizer == "Adam":
+            self._optimizer = torch.optim.Adam(self._nn.parameters(),lr=lr)
+        elif optimizer == "SGD":
+            self._optimizer = torch.optim.SGD(self._nn.parameters(),lr=lr,momentum=momentum)
+        else:
+            print("Passed incorrect optimizer. Using SGD by default")
+            self._optimizer = torch.optim.SGD(self._nn.parameters(),lr=lr,momentum=momentum)
+
         self._softmax = torch.nn.Softmax(dim=1)
         self._tau = 1
 
         self._v_loss = torch.nn.MSELoss(reduction='sum')
 
-        self._Node = TicTacMCTSNode
+        if self._env.name == "TicTacToe":
+            self._Node = TicTacMCTSNode
+        elif self._env.name == "Connect4":
+            self._Node = Connect4MCTSNode
 
     def act(self,board):
 
@@ -133,12 +145,7 @@ class AlphaZero(MCTS):
 
         a,p_a = self.get_action(s)
 
-        if len(board.shape) == 1:
-            board = board.reshape((1, board.shape[0]))
-
-        #board = Variable(torch.from_numpy(board).type(dtype=torch.float))
-
-        #p, v = self._nn(board)
+        board = self.processs_board(board)
 
         memory = Memory(board,None,p_a,None,None)
 
@@ -146,8 +153,8 @@ class AlphaZero(MCTS):
 
         return a
 
-    def create_model(self):
-        return Network()
+    def create_model(self,input_size,output_size):
+        return Network(input_size,output_size)
 
     def create_memory(self):
         return ReplayMemory(self._max_mem_size)
@@ -180,14 +187,14 @@ class AlphaZero(MCTS):
 
         if self._act_max:
             # view network
-            net_view = np.array([float(self.node_to_board(c)[1]) for c in children])
+            net_view = np.array([float(self._nn(self.node_to_board(c))[1]) for c in children])
             counts = np.array([self._N[c] for c in children])
             c = np.zeros(self._action_size)
             v = c.copy()
             c[actions] = counts
             v[actions] = net_view
-            print(c.reshape((3,3)))
-            print(v.reshape((3,3)))
+            #print(c.reshape((3,3)))
+            #print(v.reshape((3,3)))
             child_act = children[np.argmax(p_a)]
 
         return self.get_parent_action(s,child_act), p
@@ -195,23 +202,35 @@ class AlphaZero(MCTS):
     def get_parent_action(self,parent,child):
 
         a = parent.board
-
         b = child.board
 
         diff = a - b
         diffs = np.where(diff != 0)
 
-        action = diffs[0][0]
+        if a.shape[0] == 9:  # tictactoe
+            action = diffs[0][0]
+        elif len(a.flatten()) == 42:  # Connect4
+            action = diffs[1][0]
 
         return action
 
     def node_to_board(self,s):
+
         board = s.board
-        if len(board.shape) == 1:
-            board = board.reshape((1, board.shape[0]))
+        board = self.processs_board(board)
         board = Variable(torch.from_numpy(board).type(dtype=torch.float))
 
-        return self._nn(board)
+        return board
+
+    def processs_board(self,board):
+
+        if len(board.shape) == 2:
+            board = board.flatten()
+
+        if len(board.shape) == 1:
+            board = board.reshape((1, board.shape[0]))
+
+        return board
 
     def reset_current_memory(self):
         self._current_memory = []
@@ -226,14 +245,16 @@ class AlphaZero(MCTS):
 
         self.children = dict()
 
+    def save(self):
+        torch.save(self._nn.state_dict(), f"current_best_{self._env.name}")
+
     def select_child(self,node):
 
         children = self.children[node]
 
         board = node.board
 
-        if len(board.shape) == 1:
-            board = board.reshape((1, board.shape[0]))
+        board = self.processs_board(board)
 
         board = Variable(torch.from_numpy(board).type(dtype=torch.float))
 
@@ -264,10 +285,7 @@ class AlphaZero(MCTS):
             reward = node.reward()
             return (node.winner, reward)
 
-        board = node.board
-        if len(board.shape) == 1:
-            board = board.reshape((1,board.shape[0]))
-        board = Variable(torch.from_numpy(board).type(dtype=torch.float))
+        board = self.node_to_board(node)
 
         p,v = self._nn(board)
 
@@ -355,7 +373,7 @@ class DesignerZero(Designer):
             if self._record_all:
                 curr_board = self.env.board.copy()
                 b_hash = hash((curr_board.tobytes(),))
-                self._run.info[f"action_iter={iter}_{b_hash}_{game_num}"] = (curr_board.tolist(),int(action))
+                #self._run.info[f"action_iter={iter}_{b_hash}_{game_num}"] = (curr_board.tolist(),int(action))
 
             curr_state, action, next_state, r = self.env.step(action)
 
@@ -365,7 +383,8 @@ class DesignerZero(Designer):
 
             if r != 0:
                 if self._record_all:
-                    self._run.info[f"game_{iter}_{game_num}_result"] = r
+                    #self._run.info[f"game_{iter}_{game_num}_result"] = r
+                    pass
                 break
 
             curr_player = agent2 if curr_player == agent1 else agent1
@@ -401,12 +420,14 @@ class DesignerZero(Designer):
             self.current_player._act_max = True
             self.current_best._act_max = True
 
-            if (iter % 2) == 0:
+            if (iter % self._record_every) == 0:
                 # Evaluate
                 print(" ---------- Eval as player 1 vs minimax ---------")
                 self.current_player.reset_tree()
                 p1_result = self.run_eval(self.current_player, self.agent2,self._eval_iters,iter=iter)
                 vs_minimax.append(p1_result)
+                if self._run:
+                    self._run.log_scalar("tot_p1_wins", p1_result)
 
 
             print("---------- Current Player vs Current Best ____________ ")
@@ -433,14 +454,14 @@ class DesignerZero(Designer):
             self.current_best.reset_tree()
 
             if self._run:
-                self._run.log_scalar("tot_p1_wins",p1_result)
                 self._run.log_scalar("currp_vs_currbest",tot_result)
-                #self._run.log_scalar("tot_p2_wins",-1*p2_result)
 
             self.current_player._act_max = False
 
             self.current_player.reset_memory()
             self.current_best.reset_memory()
+
+            self.current_best.save()
 
         plt.plot(vs_minimax,label="vs minimax")
 

@@ -128,7 +128,7 @@ class Designer:
             if self._record_all:
                 curr_board = self.env.board.copy()
                 b_hash = hash((curr_board.tobytes(),))
-                self._run.info[f"action_iter={iter}_{b_hash}"] = (curr_board.tolist(),int(action))
+                #self._run.info[f"action_iter={iter}_{b_hash}"] = (curr_board.tolist(),int(action))
 
             curr_state, action, next_state, r = self.env.step(action)
 
@@ -138,13 +138,14 @@ class Designer:
 
             if r != 0:
                 if self._record_all:
-                    self._run.info[f"game_{iter}_result"] = r
+                    #self._run.info[f"game_{iter}_result"] = r
+                    pass
                 break
 
             curr_player = agent2 if curr_player == agent1 else agent1
 
         if render:
-            self._run.info[f"game_{iter}"] = game_array
+            #self._run.info[f"game_{iter}"] = game_array
             pass
 
         return self.env.winner

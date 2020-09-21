@@ -288,41 +288,40 @@ class MINIMAX:
 
     def run(self,node,type="minimax",d=2,n=5):
 
-        if 1 == 0:
-            pass
         #if node in self.children:
         #    return self.policy[node]
 
+        max_child = None
+
+        if type == "minimax":
+
+            max_child = self.minmax_decision(node)
+
+        elif type == "alphabeta":
+
+            max_child = self.alpha_beta(node)
+
+        elif type == "alphabeta_depth":
+
+            if node in self.children:
+                return self.policy[node]
+
+            cutoff_test = lambda node, depth: depth > d or node.is_terminal()
+
+            max_child = self.alpha_beta_depth(node,cutoff_test=cutoff_test,n=n)
+
         else:
+            raise Exception(f"Inccorect minimax alogrithm type {type}")
 
-            max_child = None
+        a = self.get_parent_action(node, max_child)
 
-            if type == "minimax":
+        self.children[node] = max_child
 
-                max_child = self.minmax_decision(node)
+        node.action = a
 
-            elif type == "alphabeta":
+        self.policy[node] = a
 
-                max_child = self.alpha_beta(node)
-
-            elif type == "alphabeta_depth":
-
-                cutoff_test = lambda node, depth: depth > d or node.is_terminal()
-
-                max_child = self.alpha_beta_depth(node,cutoff_test=cutoff_test,n=n)
-
-            else:
-                raise Exception(f"Inccorect minimax alogrithm type {type}")
-
-            a = self.get_parent_action(node, max_child)
-
-            self.children[node] = max_child
-
-            node.action = a
-
-            self.policy[node] = a
-
-            return a
+        return a
 
     def simulate(self,node,player,n=5) -> float:
         """

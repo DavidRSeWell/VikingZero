@@ -1,26 +1,33 @@
 ---
-env: TicTacToe
+env: Connect4
+#env: TicTacToe
 
 agent_config:
   agent1:
     agent: AlphaZero
-    batch_size: 32
-    max_mem_size: 1000
+    batch_size: 256
+    max_mem_size: 5000
     epochs: 10
-    n_sim: 25
+    n_sim: 100
     player: 1
-    c: 1
-    lr: 0.001
+    c: 1.41
+    lr: 0.01
+    input_size: 42
+    output_size: 7
+    optimizer: Adam
+    momentum: 0.9
 
   agent2:
-    agent: TicTacToeMinMax
+    agent: Connect4MinMax
     player: 2
-    type: "minimax"
+    type: "alphabeta_depth"
+    depth: 3
+    n_sims: 1
 
 exp_config: # experiment config
-  episodes: 200
+  episodes: 100
   record_all: False
-  record_every: 1 # how often to record info
+  record_every: 3 # how often to record info
   eval_iters: 3 # number of games to player during evaluation
   render: True
-  train_iters: 25
+  train_iters: 30

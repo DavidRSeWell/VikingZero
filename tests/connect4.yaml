@@ -17,6 +17,7 @@ agent_config:
 
 exp_config: # experiment config
   episodes: 100
-  record_every: 10 # how often to record info
+  record_every: 2 # how often to record info
+  record_all: false
   eval_iters: 3 # number of games to player during evaluation
   render: true
