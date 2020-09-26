@@ -6,17 +6,23 @@ agent_config:
   agent1:
     agent: AlphaZero
     batch_size: 32
-    max_mem_size: 1000
+    c: 1.41
     epochs: 10
+    epsilon: 0.1
+    dropout: 0.3
+    input_width: 3
+    input_height: 3
+    lr: 0.001
+    max_mem_size: 1000
+    momentum: 0.9
     n_sim: 50
-    player: 1
-    c: 1
-    lr: 0.01
-    input_size: 9
+    network_type: "cnn_small"
+    num_channels: 32
     output_size: 9
     optimizer: Adam
-    momentum: 0.9
-
+    player: 1
+    t_threshold: 30
+    weight_decay: 0.2
 
   agent2:
     agent: TicTacToeMinMax
@@ -25,9 +31,10 @@ agent_config:
 
 
 exp_config: # experiment config
-  episodes: 100
+  episodes: 50
   record_all: true
   record_every: 1 # how often to record info
   eval_iters: 3 # number of games to player during evaluation
+  eval_threshold: 1
   render: true
-  train_iters: 25
+  train_iters: 15

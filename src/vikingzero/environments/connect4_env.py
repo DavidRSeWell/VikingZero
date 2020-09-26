@@ -65,7 +65,7 @@ class Connect4(gym.Env):
         winner = self.check_winner(next_state)
 
         if winner:
-            self.winner = self.current_player
+            self.winner = winner
 
         self.board = next_state
 

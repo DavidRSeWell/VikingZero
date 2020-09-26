@@ -133,6 +133,10 @@ class TicTacToe:
         return np.where(board == 0.0)[0]
 
     @staticmethod
+    def valid_actions(board):
+        return np.where(board == 0.0)[0]
+
+    @staticmethod
     def check_winner(board):
 
         # check if this is a winning move

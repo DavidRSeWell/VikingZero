@@ -91,12 +91,13 @@ class TicTacToeMinMax(MINIMAX):
 
 class TicTacToeNode(Node):
 
-    def __init__(self,env: TicTacToe,node_type,board: np.array, player: int, winner = 0):
+    def __init__(self,env: TicTacToe,node_type,board: np.array, player: int, winner = 0, root = False):
         self.action = None
         self.board = board
         self.player = player
         self.env = env
         self.node = node_type
+        self.root = root
         self.winner = winner
 
     def find_random_child(self):
@@ -141,8 +142,8 @@ class TicTacToeNode(Node):
 
 
 class TicTacMCTSNode(TicTacToeNode):
-    def __init__(self, env: TicTacToe, board: np.array, player: int, winner=0):
-        super().__init__(env, TicTacMCTSNode, board, player, winner)
+    def __init__(self, env: TicTacToe, board: np.array, player: int, winner=0,root=False):
+        super().__init__(env, TicTacMCTSNode, board, player, winner,root)
 
     def reward(self) -> float:
         if self.winner == -1:
@@ -155,6 +156,7 @@ class TicTacMCTSNode(TicTacToeNode):
         elif int(self.winner) == self.player:
             return -1
         """
+
 
 class TicTacMiniNode(TicTacToeNode):
     def __init__(self, env: TicTacToe,board: np.array, player: int, winner=0):

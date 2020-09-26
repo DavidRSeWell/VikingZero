@@ -5,29 +5,35 @@ env: Connect4
 agent_config:
   agent1:
     agent: AlphaZero
-    batch_size: 256
-    max_mem_size: 5000
+    batch_size: 128
+    c: 1
     epochs: 10
-    n_sim: 100
-    player: 1
-    c: 1.41
-    lr: 0.01
-    input_size: 42
+    epsilon: 0.05
+    input_width: 7
+    input_height: 6
+    lr: 0.001
+    max_mem_size: 20000
+    momentum: 0.9
+    n_sim: 50
+    num_channels: 84
+    network_type: "cnn_small"
     output_size: 7
     optimizer: Adam
-    momentum: 0.9
+    player: 1
+    t_threshold: 30
+    weight_decay: 0.1
 
   agent2:
     agent: Connect4MinMax
     player: 2
     type: "alphabeta_depth"
-    depth: 3
-    n_sims: 1
+    depth: 2
+    n_sims: 5
 
 exp_config: # experiment config
   episodes: 100
   record_all: False
-  record_every: 3 # how often to record info
-  eval_iters: 3 # number of games to player during evaluation
+  record_every: 5 # how often to record info
+  eval_iters: 5 # number of games to player during evaluation
   render: True
   train_iters: 30

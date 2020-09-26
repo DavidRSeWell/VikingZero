@@ -44,20 +44,20 @@ def test_designer():
         #"c": np.sqrt(2),
         #"n_sim": 200
         "type": "alphabeta_depth",
-        "depth":3,
-        "n_sims": 2
+        "depth":2,
+        "n_sims": 5
     }
     agent2_config = {
         "agent": "Connect4MinMax",
         "player":2,
         "type":"alphabeta_depth",
         "depth":2,
-        "n_sims":2
+        "n_sims":5
     }
 
 
 
-    designer = Connect4Designer(iters=10,env=env
+    designer = Connect4Designer(iters=50,env=env
                                 ,agent1_config=agent1_config
                                 ,agent2_config=agent2_config
                                 )

@@ -2,6 +2,7 @@ import copy
 import matplotlib.pyplot as plt
 import numpy as np
 import random
+import time
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -26,6 +27,125 @@ class Memory:
     action_mcts: np.array
     value: np.float
     z: np.float
+
+
+class CnnNNetSmall(nn.Module):
+    def __init__(self,width, height,  action_size, num_channels,dropout):
+        # game params
+        self.action_size = action_size
+        self.board_x, self.board_y = width, height
+        self.dropout = dropout
+        self.num_channels = num_channels
+
+        super(CnnNNetSmall, self).__init__()
+        self.conv1 = nn.Conv2d(1, self.num_channels, 3, stride=1, padding=1)
+        self.conv2 = nn.Conv2d(self.num_channels, self.num_channels, 3, stride=1)
+        #self.conv3 = nn.Conv2d(self.num_channels, self.num_channels, 3, stride=1)
+
+
+        self.bn1 = nn.BatchNorm2d(self.num_channels)
+        self.bn2 = nn.BatchNorm2d(self.num_channels)
+        #self.bn3 = nn.BatchNorm2d(self.num_channels)
+
+        self.fc1 = nn.Linear(self.num_channels*(self.board_x-2)*(self.board_y-2), self.num_channels)
+        self.fc_bn1 = nn.BatchNorm1d(self.num_channels)
+
+        self.fc2 = nn.Linear(self.num_channels, self.action_size)
+
+        self.fc3 = nn.Linear(self.num_channels, 1)
+
+    def forward(self, s):
+        #                                                           s: batch_size x board_x x board_y
+        s = s.view(-1, 1, self.board_y, self.board_x)                # batch_size x 1 x board_x x board_y
+        s = F.relu(self.bn1(self.conv1(s)))                          # batch_size x num_channels x board_x x board_y
+        s = F.relu(self.bn2(self.conv2(s)))                          # batch_size x num_channels x board_x x board_y
+        #s = F.relu(self.bn3(self.conv3(s)))                          # batch_size x num_channels x board_x x board_y
+        s = s.view(-1, self.num_channels*(self.board_x-2)*(self.board_y-2))
+
+        s = F.dropout(F.relu(self.fc_bn1(self.fc1(s))), p=self.dropout, training=self.training)  # batch_size x 1024
+
+        pi = self.fc2(s)                                                                         # batch_size x action_size
+        v = self.fc3(s)                                                                          # batch_size x 1
+
+        return F.log_softmax(pi, dim=1), torch.tanh(v)
+
+    def predict(self, board):
+        """
+        board: np array with board
+        """
+        # timing
+        # preparing input
+        board = board.view(1, self.board_y, self.board_x)
+        self.eval()
+        with torch.no_grad():
+            pi, v = self.forward(board)
+
+        p,v =  torch.exp(pi).data.cpu().numpy()[0], v.data.cpu().numpy()[0]
+
+        return p,v[0]
+
+
+class CnnNNet(nn.Module):
+    def __init__(self,width, height,  action_size, num_channels,dropout):
+        # game params
+        self.action_size = action_size
+        self.board_x, self.board_y = width, height
+        self.dropout = dropout
+        self.num_channels = num_channels
+
+        super(CnnNNet, self).__init__()
+        self.conv1 = nn.Conv2d(1, self.num_channels, 3, stride=1, padding=1)
+        self.conv2 = nn.Conv2d(self.num_channels, self.num_channels, 3, stride=1, padding=1)
+        self.conv3 = nn.Conv2d(self.num_channels, self.num_channels, 3, stride=1)
+        self.conv4 = nn.Conv2d(self.num_channels, self.num_channels, 3, stride=1)
+
+        self.bn1 = nn.BatchNorm2d(self.num_channels)
+        self.bn2 = nn.BatchNorm2d(self.num_channels)
+        self.bn3 = nn.BatchNorm2d(self.num_channels)
+        self.bn4 = nn.BatchNorm2d(self.num_channels)
+
+        self.fc1 = nn.Linear(self.num_channels*(self.board_x-4)*(self.board_y-4), 1024)
+        self.fc_bn1 = nn.BatchNorm1d(1024)
+
+        self.fc2 = nn.Linear(1024, 512)
+        self.fc_bn2 = nn.BatchNorm1d(512)
+
+        self.fc3 = nn.Linear(512, self.action_size)
+
+        self.fc4 = nn.Linear(512, 1)
+
+    def forward(self, s):
+        #                                                           s: batch_size x board_x x board_y
+        s = s.view(-1, 1, self.board_x, self.board_y)                # batch_size x 1 x board_x x board_y
+        s = F.relu(self.bn1(self.conv1(s)))                          # batch_size x num_channels x board_x x board_y
+        s = F.relu(self.bn2(self.conv2(s)))                          # batch_size x num_channels x board_x x board_y
+        s = F.relu(self.bn3(self.conv3(s)))                          # batch_size x num_channels x (board_x-2) x (board_y-2)
+        s = F.relu(self.bn4(self.conv4(s)))                          # batch_size x num_channels x (board_x-4) x (board_y-4)
+        s = s.view(-1, self.num_channels*(self.board_x-4)*(self.board_y-4))
+
+        s = F.dropout(F.relu(self.fc_bn1(self.fc1(s))), p=self.dropout, training=self.training)  # batch_size x 1024
+        s = F.dropout(F.relu(self.fc_bn2(self.fc2(s))), p=self.dropout, training=self.training)  # batch_size x 512
+
+        pi = self.fc3(s)                                                                         # batch_size x action_size
+        v = self.fc4(s)                                                                          # batch_size x 1
+
+        return F.log_softmax(pi, dim=1), torch.tanh(v)
+
+    def predict(self, board):
+        """
+        board: np array with board
+        """
+        # timing
+        # preparing input
+        #board = torch.FloatTensor(board.astype(np.float64))
+        board = board.view(1, self.board_x, self.board_y)
+        self.eval()
+        with torch.no_grad():
+            pi, v = self.forward(board)
+
+        p,v =  torch.exp(pi).data.cpu().numpy()[0], v.data.cpu().numpy()[0]
+
+        return p,v[0]
 
 
 class Network(nn.Module):
@@ -61,6 +181,21 @@ class Network(nn.Module):
         value_out = torch.tanh(self.value(x))
 
         return policy_out, value_out
+
+    def predict(self, board):
+        """
+        board: np array with board
+        """
+        # timing
+        # preparing input
+        #board = board.view(1, self.board_y, self.board_x)
+        self.eval()
+        with torch.no_grad():
+            pi, v = self.forward(board)
+
+        p, v = torch.exp(pi).data.cpu().numpy()[0], v.data.cpu().numpy()[0]
+
+        return p, v[0]
 
 
 class ReplayMemory(object):
@@ -100,8 +235,9 @@ class ReplayMemory(object):
 class AlphaZero(MCTS):
 
     def __init__(self,env, n_sim: int = 50, batch_size: int = 10,max_mem_size: int = 1000,
-                 epochs: int = 10, c: int = 1, lr: float = 0.001,input_size: int = 9, output_size: int = 9,
-                 player: int = 1,momentum: float = 0.9,optimizer: str = "Adam"):
+                 epochs: int = 10, c: int = 1, lr: float = 0.001, epsilon: float = 0.2,input_width: int = 3, input_height: int = 3,
+                 output_size: int = 9,player: int = 1,momentum: float = 0.9, network_type: str = "normal",optimizer: str = "Adam", t_threshold: int = 10
+                 ,test_name: str = "current",num_channels: int = 512, dropout: float = 0.3, weight_decay: float = 0.001, eval_threshold: int = 1):
         super().__init__(c)
 
         self.player = player
@@ -110,14 +246,19 @@ class AlphaZero(MCTS):
         self._act_max = False
         self._batch_size = batch_size
         self._current_memory = [] # hold memory for current game
+        self._current_moves = 0 # Track action count
+        self._dropout = dropout
         self._env = env
         self._epochs = epochs
+        self._epsilon = epsilon
+        self._eval_threshold = eval_threshold
         self._max_mem_size = max_mem_size
         self._memory = self.create_memory()
-        self._nn = self.create_model(input_size,output_size)
+        self._num_channels = num_channels
+        self._nn = self.create_model(input_width,input_height,output_size,network_type)
         self._n_sim = n_sim
         if optimizer == "Adam":
-            self._optimizer = torch.optim.Adam(self._nn.parameters(),lr=lr)
+            self._optimizer = torch.optim.Adam(self._nn.parameters(),lr=lr,weight_decay=weight_decay)
         elif optimizer == "SGD":
             self._optimizer = torch.optim.SGD(self._nn.parameters(),lr=lr,momentum=momentum)
         else:
@@ -126,8 +267,10 @@ class AlphaZero(MCTS):
 
         self._softmax = torch.nn.Softmax(dim=1)
         self._tau = 1
-
+        self._test_name = test_name
+        self._t_threshold = t_threshold
         self._v_loss = torch.nn.MSELoss(reduction='sum')
+        self._weight_decay = weight_decay
 
         if self._env.name == "TicTacToe":
             self._Node = TicTacMCTSNode
@@ -136,7 +279,7 @@ class AlphaZero(MCTS):
 
     def act(self,board):
 
-        s = self._Node(self._env,board,self._env.current_player,0)
+        s = self._Node(self._env,board,self._env.current_player,0,root=True)
         # First rum simulations to collect
         # Tree statistics
         for _ in range(self._n_sim):
@@ -151,10 +294,19 @@ class AlphaZero(MCTS):
 
         self._current_memory.append(memory)
 
-        return a
+        self._current_moves += 1
 
-    def create_model(self,input_size,output_size):
-        return Network(input_size,output_size)
+        return a, p_a
+
+    def create_model(self,width,height,output_size,nn_type):
+
+        if nn_type == "normal":
+            input_size = width*height
+            return Network(input_size,output_size)
+        elif nn_type == "cnn":
+            return CnnNNet(width,height,self._action_size,self._num_channels,self._dropout)
+        elif nn_type == "cnn_small":
+            return CnnNNetSmall(width, height, self._action_size, self._num_channels, self._dropout)
 
     def create_memory(self):
         return ReplayMemory(self._max_mem_size)
@@ -171,7 +323,8 @@ class AlphaZero(MCTS):
 
         children = self.children[s]
 
-        actions = [self.get_parent_action(s,c) for c in children]
+        #actions = [self.get_parent_action(s,c) for c in children]
+        actions = self.get_valid_actions(s)
 
         c_counts = np.array([self._N[c]**temp_power for c in children])
 
@@ -185,16 +338,24 @@ class AlphaZero(MCTS):
 
         child_act = np.random.choice(children, p=p_a)
 
-        if self._act_max:
+        if self._act_max or (self._current_moves > self._t_threshold):
+        #if self._act_max:
+        #if 1 == 1:
             # view network
-            net_view = np.array([float(self._nn(self.node_to_board(c))[1]) for c in children])
+            net_view = list(zip(*[self._nn.predict(self.node_to_board(c)) for c in children]))
+
+            p_view = net_view[0]
+            v_view = net_view[1]
+
             counts = np.array([self._N[c] for c in children])
             c = np.zeros(self._action_size)
             v = c.copy()
             c[actions] = counts
-            v[actions] = net_view
+            v[actions] = v_view
             #print(c.reshape((3,3)))
+            print(c)
             #print(v.reshape((3,3)))
+            print(v)
             child_act = children[np.argmax(p_a)]
 
         return self.get_parent_action(s,child_act), p
@@ -214,6 +375,16 @@ class AlphaZero(MCTS):
 
         return action
 
+    def get_valid_actions(self,s):
+        """
+        Take in node and return the valid actions from that node
+        :param n:
+        :return:
+        """
+        board = s.board
+
+        return self._env.valid_actions(board)
+
     def node_to_board(self,s):
 
         board = s.board
@@ -221,6 +392,9 @@ class AlphaZero(MCTS):
         board = Variable(torch.from_numpy(board).type(dtype=torch.float))
 
         return board
+
+    def predict(self,board):
+        return self._nn.predict(board)
 
     def processs_board(self,board):
 
@@ -231,6 +405,16 @@ class AlphaZero(MCTS):
             board = board.reshape((1, board.shape[0]))
 
         return board
+
+    def reset(self):
+        """
+        Reset the agent before playing a new game
+        :return:
+        """
+        self._current_moves = 0
+        #self._act_max = False
+        self.reset_current_memory()
+        self.reset_tree()
 
     def reset_current_memory(self):
         self._current_memory = []
@@ -245,12 +429,14 @@ class AlphaZero(MCTS):
 
         self.children = dict()
 
-    def save(self):
-        torch.save(self._nn.state_dict(), f"current_best_{self._env.name}")
+    def save(self,id):
+        torch.save(self._nn.state_dict(), f"current_best_{self._env.name}_{id}")
 
     def select_child(self,node):
 
         children = self.children[node]
+
+        actions = self.get_valid_actions(node)
 
         board = node.board
 
@@ -258,15 +444,22 @@ class AlphaZero(MCTS):
 
         board = Variable(torch.from_numpy(board).type(dtype=torch.float))
 
-        p , v = self._nn(board)
+        p , v = self._nn.predict(board)
 
-        p = p.detach().numpy()
+        #p = p.detach().numpy().reshape(self._action_size)
         # renormalize
+        p[[a for a in range(self._action_size) if a not in actions]] = 0
+
         p = p / p.sum()
 
-        p = p.reshape(self._action_size)
-
         N_p = self._N[node]
+
+        if node.root:
+            dir_noise = np.zeros(self._action_size)
+
+            dir_noise[actions] = np.random.dirichlet([0.3]*len(actions))
+
+            p = (1 - self._epsilon)*p + self._epsilon*dir_noise
 
         child_v = []
         for child in children:
@@ -287,7 +480,7 @@ class AlphaZero(MCTS):
 
         board = self.node_to_board(node)
 
-        p,v = self._nn(board)
+        p,v = self._nn.predict(board)
 
         return (node.player,float(v))
 
@@ -317,6 +510,8 @@ class AlphaZero(MCTS):
 
     def train_network(self):
 
+        self._nn.train()
+
         if len(self._memory) < self._batch_size:
             return
 
@@ -345,15 +540,15 @@ class AlphaZero(MCTS):
 
     def loss_v(self, targets, outputs):
 
-        #return torch.sum((targets - outputs) ** 2)
         return torch.sum((targets - outputs) ** 2) / targets.size()[0]
 
 
 class DesignerZero(Designer):
 
-    def __init__(self,env,agent_config,exp_config,_run=False):
+    def __init__(self,env,agent_config,exp_config,_run=False, eval_threshold = 1):
         super().__init__(env,agent_config,exp_config, _run=_run)
 
+        self.eval_threshold = eval_threshold
         self._train_iters = exp_config["train_iters"]
         self.current_best = self.load_agent(self._agent1_config)
         self.current_player = copy.deepcopy(self.current_best)
@@ -362,6 +557,16 @@ class DesignerZero(Designer):
 
         self.env.reset()
 
+        try:
+            agent1.reset()
+        except:
+            pass
+
+        try:
+            agent2.reset()
+        except:
+            pass
+
         curr_player = agent1
 
         game_array = []
@@ -369,6 +574,8 @@ class DesignerZero(Designer):
         while True:
 
             action = curr_player.act(self.env.board)
+            if type(action) == tuple:
+                action , p_a = action
 
             if self._record_all:
                 curr_board = self.env.board.copy()
@@ -409,10 +616,18 @@ class DesignerZero(Designer):
             print(f"Running iteration {iter}")
 
             # Self Play
+            s_time = time.time()
             self.train(self.current_player,self._train_iters)
+            e_time = time.time()
+            min_time = (e_time - s_time) / 60.0
+            print(f"Training time ={min_time} For {self._train_iters} iters")
 
             # Train Network
+            s_time = time.time()
             self.current_player.train_network()
+            e_time = time.time()
+            min_time = (e_time - s_time) / 60.0
+            print(f"Training network time ={min_time}")
 
             #self.current_player._memory.save("")
 
@@ -429,23 +644,31 @@ class DesignerZero(Designer):
                 if self._run:
                     self._run.log_scalar("tot_p1_wins", p1_result)
 
+                print(" ---------- Eval as player 2 vs minimax ---------")
+                self.current_player.reset_tree()
+                p2_result = self.run_eval(self.agent2, self.current_player, self._eval_iters, iter=iter)
+                p2_result *= -1
+                vs_minimax.append(p2_result)
+                if self._run:
+                    self._run.log_scalar("tot_p2_wins", p2_result)
 
             print("---------- Current Player vs Current Best ____________ ")
             self.current_player.reset_tree()
             self.current_best.reset_tree()
 
-            curr_result = self.run_eval(self.current_player,self.current_best,1,iter=iter)
+            curr_result = self.run_eval(self.current_player,self.current_best,5,iter=iter)
 
             self.current_player.reset_tree()
             self.current_best.reset_tree()
 
-            curr_result2 = self.run_eval(self.current_best,self.current_player,1,iter=iter)
+            curr_result2 = self.run_eval(self.current_best,self.current_player,5,iter=iter)
 
             tot_result = curr_result + -1*curr_result2
 
             vs_best.append(tot_result)
 
-            if tot_result > 0:
+            if tot_result >= self.eval_threshold:
+                print(f"Changing Agent on iteration = {iter}")
                 self.current_best = copy.deepcopy(self.current_player)
             else:
                 self.current_player = copy.deepcopy(self.current_best)
@@ -458,10 +681,10 @@ class DesignerZero(Designer):
 
             self.current_player._act_max = False
 
-            self.current_player.reset_memory()
-            self.current_best.reset_memory()
+            #self.current_player.reset_memory()
+            #self.current_best.reset_memory()
 
-            self.current_best.save()
+            self.current_best.save(self._run._id)
 
         plt.plot(vs_minimax,label="vs minimax")
 
@@ -494,8 +717,6 @@ class DesignerZero(Designer):
         agent.reset_current_memory()
 
         for _ in range(iters):
-
-            agent.reset_tree()
 
             z = self.play_game(False,agent,agent)
 

@@ -117,8 +117,10 @@ class Connect4MiniNode(Connect4Node):
 
 class Connect4MCTSNode(Connect4Node):
 
-    def __init__(self, env: Connect4, board: np.array, player: int, winner=0):
+    def __init__(self, env: Connect4, board: np.array, player: int, winner=0,root=False):
         super().__init__(env, Connect4MCTSNode,board, player, winner)
+
+        self.root = root
 
     def reward(self) -> float:
         if self.winner == -1:

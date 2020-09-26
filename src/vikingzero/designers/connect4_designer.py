@@ -1,4 +1,5 @@
 import numpy as np
+import time
 
 from sacred import Experiment
 
@@ -41,6 +42,8 @@ class Connect4Designer:
 
     def play_game(self,render):
 
+        s_time = time.time()
+
         self.env.reset()
 
         curr_player = self.agent1
@@ -59,6 +62,9 @@ class Connect4Designer:
 
             curr_player = self.agent2 if curr_player == self.agent1 else self.agent1
 
+        e_time = time.time()
+        t_minutes = (e_time - s_time) / 60.0
+        print(f"Game Runtime = {t_minutes}")
         return self.env.winner
 
     def run(self,render=False,show_every=5):
