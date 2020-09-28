@@ -123,11 +123,17 @@ class Connect4MCTSNode(Connect4Node):
         self.root = root
 
     def reward(self) -> float:
+        """
         if self.winner == -1:
             return 0.5
         elif int(self.winner) != self.player:
             reward = 1
             return reward
+        """
+        if self.winner == -1:
+            return 0
+        else:
+            return 1
 
 
 class Connect4MCTS(MCTS):

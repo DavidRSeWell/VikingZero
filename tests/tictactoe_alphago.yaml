@@ -13,16 +13,16 @@ agent_config:
     input_width: 3
     input_height: 3
     lr: 0.001
-    max_mem_size: 1000
+    max_mem_size: 5000
     momentum: 0.9
-    n_sim: 50
-    network_type: "cnn_small"
+    n_sim: 25
+    network_type: "normal"
     num_channels: 32
     output_size: 9
     optimizer: Adam
     player: 1
-    t_threshold: 30
-    weight_decay: 0.2
+    t_threshold: 2
+    weight_decay: 0
 
   agent2:
     agent: TicTacToeMinMax
@@ -31,7 +31,7 @@ agent_config:
 
 
 exp_config: # experiment config
-  episodes: 50
+  episodes: 20
   record_all: true
   record_every: 1 # how often to record info
   eval_iters: 3 # number of games to player during evaluation

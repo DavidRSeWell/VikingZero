@@ -279,7 +279,7 @@ class AlphaZero(MCTS):
 
     def act(self,board):
 
-        s = self._Node(self._env,board,self._env.current_player,0,root=True)
+        s = self._Node(self._env,board,self._env.check_turn(board),0,root=True)
         # First rum simulations to collect
         # Tree statistics
         for _ in range(self._n_sim):
@@ -311,6 +311,9 @@ class AlphaZero(MCTS):
     def create_memory(self):
         return ReplayMemory(self._max_mem_size)
 
+    def eval(self):
+        self._act_max = True
+
     def get_action(self,s) -> tuple:
         """
         Sample action based on statistics from tree
@@ -323,7 +326,6 @@ class AlphaZero(MCTS):
 
         children = self.children[s]
 
-        #actions = [self.get_parent_action(s,c) for c in children]
         actions = self.get_valid_actions(s)
 
         c_counts = np.array([self._N[c]**temp_power for c in children])
@@ -339,8 +341,6 @@ class AlphaZero(MCTS):
         child_act = np.random.choice(children, p=p_a)
 
         if self._act_max or (self._current_moves > self._t_threshold):
-        #if self._act_max:
-        #if 1 == 1:
             # view network
             net_view = list(zip(*[self._nn.predict(self.node_to_board(c)) for c in children]))
 
@@ -412,7 +412,6 @@ class AlphaZero(MCTS):
         :return:
         """
         self._current_moves = 0
-        #self._act_max = False
         self.reset_current_memory()
         self.reset_tree()
 
@@ -515,6 +514,10 @@ class AlphaZero(MCTS):
         if len(self._memory) < self._batch_size:
             return
 
+        avg_total = 0
+        avg_value = 0
+        avg_policy = 0
+
         for _ in range(self._epochs):
 
             data = self._memory.sample(self._batch_size)
@@ -531,9 +534,20 @@ class AlphaZero(MCTS):
             loss_policy = self.loss_pi(target_p, p)
 
             loss = loss_value + loss_policy #loss_policy
+
+            avg_total += loss
+            avg_value += loss_value
+            avg_policy += loss_policy
+
             self._optimizer.zero_grad()
             loss.backward()
             self._optimizer.step()
+
+
+        return avg_total / self._epochs, avg_policy / self._epochs, avg_value / self._epochs
+
+    def train(self):
+        self._act_max = False
 
     def loss_pi(self, targets, outputs):
         return -torch.sum(targets * outputs) / targets.size()[0]
@@ -552,6 +566,13 @@ class DesignerZero(Designer):
         self._train_iters = exp_config["train_iters"]
         self.current_best = self.load_agent(self._agent1_config)
         self.current_player = copy.deepcopy(self.current_best)
+
+        ###########
+        # LOSS
+        ###########
+        self.avg_loss = []
+        self.avg_value_loss = []
+        self.avg_policy_loss = []
 
     def play_game(self,render,agent1,agent2,iter=None,game_num=0):
 
@@ -624,28 +645,29 @@ class DesignerZero(Designer):
 
             # Train Network
             s_time = time.time()
-            self.current_player.train_network()
+            avg_total, avg_val, avg_policy = self.current_player.train_network()
+
+            self._run.log_scalar("Total Loss", avg_total)
+            self._run.log_scalar("Value loss", avg_val)
+            self._run.log_scalar("Policy loss", avg_policy)
+
+            self.avg_loss.append(avg_total)
+            self.avg_value_loss.append(avg_val)
+            self.avg_policy_loss.append(avg_policy)
+
             e_time = time.time()
             min_time = (e_time - s_time) / 60.0
             print(f"Training network time ={min_time}")
 
-            #self.current_player._memory.save("")
-
-            # For Evaluation the players should be taking max actions
-            self.current_player._act_max = True
-            self.current_best._act_max = True
-
             if (iter % self._record_every) == 0:
                 # Evaluate
                 print(" ---------- Eval as player 1 vs minimax ---------")
-                self.current_player.reset_tree()
                 p1_result = self.run_eval(self.current_player, self.agent2,self._eval_iters,iter=iter)
                 vs_minimax.append(p1_result)
                 if self._run:
                     self._run.log_scalar("tot_p1_wins", p1_result)
 
                 print(" ---------- Eval as player 2 vs minimax ---------")
-                self.current_player.reset_tree()
                 p2_result = self.run_eval(self.agent2, self.current_player, self._eval_iters, iter=iter)
                 p2_result *= -1
                 vs_minimax.append(p2_result)
@@ -656,18 +678,19 @@ class DesignerZero(Designer):
             self.current_player.reset_tree()
             self.current_best.reset_tree()
 
-            curr_result = self.run_eval(self.current_player,self.current_best,5,iter=iter)
+            curr_result = self.run_eval(self.current_player,self.current_best,10,iter=iter)
 
             self.current_player.reset_tree()
             self.current_best.reset_tree()
 
-            curr_result2 = self.run_eval(self.current_best,self.current_player,5,iter=iter)
+            curr_result2 = self.run_eval(self.current_best,self.current_player,10,iter=iter)
 
             tot_result = curr_result + -1*curr_result2
 
             vs_best.append(tot_result)
 
-            if tot_result >= self.eval_threshold:
+            #if (curr_result >= self.eval_threshold) and (-1*curr_result2 >= self.eval_threshold):
+            if (tot_result >= self.eval_threshold):
                 print(f"Changing Agent on iteration = {iter}")
                 self.current_best = copy.deepcopy(self.current_player)
             else:
@@ -686,10 +709,14 @@ class DesignerZero(Designer):
 
             self.current_best.save(self._run._id)
 
-        plt.plot(vs_minimax,label="vs minimax")
-
-        plt.plot(vs_best,label="vs best")
-
+        plt.plot(self.avg_loss,label="Avg total loss")
+        plt.legend()
+        plt.show()
+        plt.plot(self.avg_value_loss,label="Avg val loss")
+        plt.legend()
+        plt.show()
+        plt.plot(self.avg_policy_loss,label="Avg policy loss")
+        plt.legend()
         plt.show()
 
     def run_eval(self,agent1,agent2,iters,render=False,iter=None):
@@ -700,8 +727,15 @@ class DesignerZero(Designer):
         """
 
         agent1.player = 1
+        try:
+            agent1.eval()
+        except:
+            pass
         agent2.player = 2
-
+        try:
+            agent2.eval()
+        except:
+            pass
         result = 0
         for i in range(iters):
             winner = self.play_game(self._render, agent1, agent2, iter=iter,game_num=i)
@@ -715,6 +749,8 @@ class DesignerZero(Designer):
     def train(self,agent,iters):
 
         agent.reset_current_memory()
+
+        agent.train()
 
         for _ in range(iters):
 

@@ -23,6 +23,7 @@ pyqtgraph = "^0.11.0"
 PyQtWebEngine = "^5.15.0"
 flask = "^1.1.2"
 python-dotenv = "^0.14.0"
+neptune-client = "^0.4.120"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
