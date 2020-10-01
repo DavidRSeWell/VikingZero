@@ -1,5 +1,6 @@
 import copy
 import matplotlib.pyplot as plt
+import neptune
 import numpy as np
 import random
 import time
@@ -40,7 +41,7 @@ class CnnNNetSmall(nn.Module):
         super(CnnNNetSmall, self).__init__()
         self.conv1 = nn.Conv2d(1, self.num_channels, 3, stride=1, padding=1)
         self.conv2 = nn.Conv2d(self.num_channels, self.num_channels, 3, stride=1)
-        #self.conv3 = nn.Conv2d(self.num_channels, self.num_channels, 3, stride=1)
+        self.conv3 = nn.Conv2d(self.num_channels, self.num_channels, 3, stride=1)
 
 
         self.bn1 = nn.BatchNorm2d(self.num_channels)
@@ -56,6 +57,7 @@ class CnnNNetSmall(nn.Module):
 
     def forward(self, s):
         #                                                           s: batch_size x board_x x board_y
+        s[s == 2] = -1
         s = s.view(-1, 1, self.board_y, self.board_x)                # batch_size x 1 x board_x x board_y
         s = F.relu(self.bn1(self.conv1(s)))                          # batch_size x num_channels x board_x x board_y
         s = F.relu(self.bn2(self.conv2(s)))                          # batch_size x num_channels x board_x x board_y
@@ -94,10 +96,10 @@ class CnnNNet(nn.Module):
         self.num_channels = num_channels
 
         super(CnnNNet, self).__init__()
-        self.conv1 = nn.Conv2d(1, self.num_channels, 3, stride=1, padding=1)
-        self.conv2 = nn.Conv2d(self.num_channels, self.num_channels, 3, stride=1, padding=1)
-        self.conv3 = nn.Conv2d(self.num_channels, self.num_channels, 3, stride=1)
-        self.conv4 = nn.Conv2d(self.num_channels, self.num_channels, 3, stride=1)
+        self.conv1 = nn.Conv2d(1, self.num_channels, 2, stride=1, padding=1)
+        self.conv2 = nn.Conv2d(self.num_channels, self.num_channels, 2, stride=1, padding=1)
+        self.conv3 = nn.Conv2d(self.num_channels, self.num_channels, 2, stride=1)
+        self.conv4 = nn.Conv2d(self.num_channels, self.num_channels, 2, stride=1)
 
         self.bn1 = nn.BatchNorm2d(self.num_channels)
         self.bn2 = nn.BatchNorm2d(self.num_channels)
@@ -116,6 +118,7 @@ class CnnNNet(nn.Module):
 
     def forward(self, s):
         #                                                           s: batch_size x board_x x board_y
+        s[s == 2] = -1
         s = s.view(-1, 1, self.board_x, self.board_y)                # batch_size x 1 x board_x x board_y
         s = F.relu(self.bn1(self.conv1(s)))                          # batch_size x num_channels x board_x x board_y
         s = F.relu(self.bn2(self.conv2(s)))                          # batch_size x num_channels x board_x x board_y
@@ -159,8 +162,11 @@ class Network(nn.Module):
         # Here, I used a single linear layer for simplicity purposes
         # But any network configuration should work
         self.h1 = nn.Linear(input_size, input_size*2)
-        self.h2 = nn.Linear(input_size*2, input_size*2)
-        self.h3 = nn.Linear(input_size*2, input_size)
+        self.h2 = nn.Linear(input_size*2, input_size*3)
+        self.h3 = nn.Linear(input_size*3, input_size*4)
+        self.h4 = nn.Linear(input_size*4, input_size*3)
+        self.h5 = nn.Linear(input_size*3, input_size*2)
+        self.h6 = nn.Linear(input_size*2, input_size)
         #self.h4 = nn.Linear(18, 9)
 
         # Set up the different heads
@@ -170,17 +176,21 @@ class Network(nn.Module):
 
     def forward(self, x):
 
+        x[x == 2] = -1
         # Run the shared layer(s)
+        x = x.view(-1, self._input_size)
         x = F.relu(self.h1(x))
         x = F.relu(self.h2(x))
         x = F.relu(self.h3(x))
-        #x = F.relu(self.h4(x))
+        x = F.relu(self.h4(x))
+        x = F.relu(self.h5(x))
+        x = F.relu(self.h6(x))
 
         # Run the different heads with the output of the shared layers as input
-        policy_out = F.log_softmax(self.policy(x), dim=1)
+        p = F.log_softmax(self.policy(x), dim=1)
         value_out = torch.tanh(self.value(x))
 
-        return policy_out, value_out
+        return p, value_out
 
     def predict(self, board):
         """
@@ -252,6 +262,8 @@ class AlphaZero(MCTS):
         self._epochs = epochs
         self._epsilon = epsilon
         self._eval_threshold = eval_threshold
+        self._input_height = input_height
+        self._input_width = input_width
         self._max_mem_size = max_mem_size
         self._memory = self.create_memory()
         self._num_channels = num_channels
@@ -295,6 +307,9 @@ class AlphaZero(MCTS):
         self._current_memory.append(memory)
 
         self._current_moves += 1
+
+        #assert self._current_moves <= 10
+        #assert len(self._current_memory) <= 10
 
         return a, p_a
 
@@ -341,6 +356,7 @@ class AlphaZero(MCTS):
         child_act = np.random.choice(children, p=p_a)
 
         if self._act_max or (self._current_moves > self._t_threshold):
+            #TODO clean up this mess
             # view network
             net_view = list(zip(*[self._nn.predict(self.node_to_board(c)) for c in children]))
 
@@ -357,6 +373,14 @@ class AlphaZero(MCTS):
             #print(v.reshape((3,3)))
             print(v)
             child_act = children[np.argmax(p_a)]
+
+            bestAs = np.array(np.argwhere(counts == np.max(counts))).flatten()
+            bestAs = np.random.choice(bestAs)
+            child_act = children[bestAs]
+            parent_act = self.get_parent_action(s,child_act)
+            p = np.zeros(self._action_size)
+            p[parent_act] = 1
+            return parent_act, p
 
         return self.get_parent_action(s,child_act), p
 
@@ -496,15 +520,22 @@ class AlphaZero(MCTS):
 
             if z == -1:
                 mem.z = 0.0001
+                #mem.z = 0
             elif p_turn != z: # if winner != player of node
                 mem.z = -1
             elif p_turn == z:
                 mem.z = 1
             else:
                 raise Exception("Incorrect winner passed")
-
+            """
+            if z == 2:
+                print("player 2 won")
+            print("--------- BOARD STATE ----------------")
+            print(mem.state.reshape((self._input_height, self._input_width)))
+            print(f"Turn = {p_turn}")
+            print(f"z = {mem.z}")
+            """
             self._memory.push(mem)
-
         self.reset_current_memory()
 
     def train_network(self):
@@ -512,7 +543,7 @@ class AlphaZero(MCTS):
         self._nn.train()
 
         if len(self._memory) < self._batch_size:
-            return
+            return None,None,None
 
         avg_total = 0
         avg_value = 0
@@ -549,6 +580,15 @@ class AlphaZero(MCTS):
     def train(self):
         self._act_max = False
 
+    def transform_board(self,board):
+        p1 = np.zeros(board.shape)
+        p2 = np.zeros(board.shape)
+        p = np.ones(board.shape)
+
+        p1[board == 1] = 1
+        p2[board == 2] = 1
+        p = p*self._env.check_turn(board)
+
     def loss_pi(self, targets, outputs):
         return -torch.sum(targets * outputs) / targets.size()[0]
 
@@ -566,6 +606,13 @@ class DesignerZero(Designer):
         self._train_iters = exp_config["train_iters"]
         self.current_best = self.load_agent(self._agent1_config)
         self.current_player = copy.deepcopy(self.current_best)
+        self.exp_id = self.load_exp_id()
+
+        if not self._run:
+            try:
+                self._run= neptune.get_experiment()
+            except:
+                pass
 
         ###########
         # LOSS
@@ -573,6 +620,17 @@ class DesignerZero(Designer):
         self.avg_loss = []
         self.avg_value_loss = []
         self.avg_policy_loss = []
+
+    def load_exp_id(self):
+        if self._run:
+            return self._run.id
+        else:
+            try:
+                return neptune.get_experiment().id
+            except:
+                pass
+
+        return None
 
     def play_game(self,render,agent1,agent2,iter=None,game_num=0):
 
@@ -582,7 +640,6 @@ class DesignerZero(Designer):
             agent1.reset()
         except:
             pass
-
         try:
             agent2.reset()
         except:
@@ -610,9 +667,6 @@ class DesignerZero(Designer):
                 self.env.render()
 
             if r != 0:
-                if self._record_all:
-                    #self._run.info[f"game_{iter}_{game_num}_result"] = r
-                    pass
                 break
 
             curr_player = agent2 if curr_player == agent1 else agent1
@@ -645,16 +699,12 @@ class DesignerZero(Designer):
 
             # Train Network
             s_time = time.time()
-            avg_total, avg_val, avg_policy = self.current_player.train_network()
+            avg_total, avg_policy, avg_val = self.current_player.train_network()
 
-            self._run.log_scalar("Total Loss", avg_total)
-            self._run.log_scalar("Value loss", avg_val)
-            self._run.log_scalar("Policy loss", avg_policy)
-
-            self.avg_loss.append(avg_total)
-            self.avg_value_loss.append(avg_val)
-            self.avg_policy_loss.append(avg_policy)
-
+            if self._run:
+                neptune.log_metric("Total Loss", avg_total)
+                neptune.log_metric("Value loss", avg_val)
+                neptune.log_metric("Policy loss", avg_policy)
             e_time = time.time()
             min_time = (e_time - s_time) / 60.0
             print(f"Training network time ={min_time}")
@@ -665,50 +715,39 @@ class DesignerZero(Designer):
                 p1_result = self.run_eval(self.current_player, self.agent2,self._eval_iters,iter=iter)
                 vs_minimax.append(p1_result)
                 if self._run:
-                    self._run.log_scalar("tot_p1_wins", p1_result)
+                    neptune.log_metric("tot_p1_wins", p1_result)
 
                 print(" ---------- Eval as player 2 vs minimax ---------")
                 p2_result = self.run_eval(self.agent2, self.current_player, self._eval_iters, iter=iter)
                 p2_result *= -1
                 vs_minimax.append(p2_result)
                 if self._run:
-                    self._run.log_scalar("tot_p2_wins", p2_result)
+                    neptune.log_metric("tot_p2_wins", p2_result)
 
             print("---------- Current Player vs Current Best ____________ ")
-            self.current_player.reset_tree()
-            self.current_best.reset_tree()
 
-            curr_result = self.run_eval(self.current_player,self.current_best,10,iter=iter)
+            run_evaluator = 0
+            if run_evaluator:
+                curr_result = self.run_eval(self.current_player,self.current_best,10,iter=iter)
 
-            self.current_player.reset_tree()
-            self.current_best.reset_tree()
+                curr_result2 = self.run_eval(self.current_best,self.current_player,10,iter=iter)
 
-            curr_result2 = self.run_eval(self.current_best,self.current_player,10,iter=iter)
+                tot_result = curr_result + -1*curr_result2
 
-            tot_result = curr_result + -1*curr_result2
+                vs_best.append(tot_result)
 
-            vs_best.append(tot_result)
+                if (tot_result >= self.eval_threshold):
+                    print(f"Changing Agent on iteration = {iter}")
+                    self.current_best = copy.deepcopy(self.current_player)
+                else:
+                    self.current_player = copy.deepcopy(self.current_best)
 
-            #if (curr_result >= self.eval_threshold) and (-1*curr_result2 >= self.eval_threshold):
-            if (tot_result >= self.eval_threshold):
-                print(f"Changing Agent on iteration = {iter}")
-                self.current_best = copy.deepcopy(self.current_player)
-            else:
-                self.current_player = copy.deepcopy(self.current_best)
-
-            self.current_player.reset_tree()
-            self.current_best.reset_tree()
+                if self._run:
+                    neptune.log_metric("currp_vs_currbest",tot_result)
 
             if self._run:
-                self._run.log_scalar("currp_vs_currbest",tot_result)
-
-            self.current_player._act_max = False
-
-            #self.current_player.reset_memory()
-            #self.current_best.reset_memory()
-
-            self.current_best.save(self._run._id)
-
+                self.current_best.save(self.exp_id)
+        """
         plt.plot(self.avg_loss,label="Avg total loss")
         plt.legend()
         plt.show()
@@ -718,6 +757,7 @@ class DesignerZero(Designer):
         plt.plot(self.avg_policy_loss,label="Avg policy loss")
         plt.legend()
         plt.show()
+        """
 
     def run_eval(self,agent1,agent2,iters,render=False,iter=None):
 
@@ -727,11 +767,12 @@ class DesignerZero(Designer):
         """
 
         agent1.player = 1
+        agent2.player = 2
+
         try:
             agent1.eval()
         except:
             pass
-        agent2.player = 2
         try:
             agent2.eval()
         except:
