@@ -29,6 +29,91 @@ class Memory:
     value: np.float
     z: np.float
 
+class CnnSmall3(nn.Module):
+    def __init__(self,width, height,  action_size, num_channels):
+        # game params
+        self.action_size = action_size
+        self.board_x, self.board_y = width, height
+        self.num_channels = num_channels
+
+        super(CnnSmall3, self).__init__()
+        self.conv1 = nn.Conv2d(1, 18, 3)
+        #self.pool = nn.MaxPool2d(2, 1)
+        self.conv2 = nn.Conv2d(18, 16, 1)
+        self.fc1 = nn.Linear(16 , 32)
+        self.fc2 = nn.Linear(32, 9)
+        self.fc3 = nn.Linear(32, 1)
+
+    def forward(self, x):
+        x[x == 2] = -1
+        x = x.view(-1, 1, self.board_y, self.board_x)
+        x = F.relu(self.conv1(x))
+        x = F.relu(self.conv2(x))
+        x = F.relu(self.fc1(x.view(-1,16)))
+        pi = self.fc2(x)  # batch_size x action_size
+        v = self.fc3(x)  # batch_size x 1
+
+        return F.log_softmax(pi, dim=1), torch.tanh(v)
+
+    def predict(self, board):
+        """
+        board: np array with board
+        """
+        # timing
+        # preparing input
+        board = board.view(1, self.board_y, self.board_x)
+        self.eval()
+        with torch.no_grad():
+            pi, v = self.forward(board)
+
+        p,v =  torch.exp(pi).data.cpu().numpy()[0], v.data.cpu().numpy()[0]
+
+        return p,v[0]
+
+
+class CnnSmall2(nn.Module):
+    def __init__(self,width, height,  action_size, num_channels):
+        # game params
+        self.action_size = action_size
+        self.board_x, self.board_y = width, height
+        self.num_channels = num_channels
+
+        super(CnnSmall2, self).__init__()
+        self.conv1 = nn.Conv2d(1, self.num_channels, 3)
+
+        self.fc1 = nn.Linear(self.num_channels, 9)
+
+        self.fc2 = nn.Linear(9, self.action_size)
+
+        self.fc3 = nn.Linear(9, 1)
+
+    def forward(self, s):
+        #                                                           s: batch_size x board_x x board_y
+        s[s == 2] = -1
+        s = s.view(-1, 1, self.board_y, self.board_x)                # batch_size x 1 x board_x x board_y
+        s = F.relu(self.conv1(s))                       # batch_size x num_channels x board_x x board_y
+        s = s.view(-1,self.num_channels)
+        s = F.relu(self.fc1(s))
+        pi = self.fc2(s)                                                                         # batch_size x action_size
+        v = self.fc3(s)                                                                          # batch_size x 1
+
+        return F.log_softmax(pi, dim=1), torch.tanh(v)
+
+    def predict(self, board):
+        """
+        board: np array with board
+        """
+        # timing
+        # preparing input
+        board = board.view(1, self.board_y, self.board_x)
+        self.eval()
+        with torch.no_grad():
+            pi, v = self.forward(board)
+
+        p,v =  torch.exp(pi).data.cpu().numpy()[0], v.data.cpu().numpy()[0]
+
+        return p,v[0]
+
 
 class CnnNNetSmall(nn.Module):
     def __init__(self,width, height,  action_size, num_channels,dropout):
@@ -322,6 +407,12 @@ class AlphaZero(MCTS):
             return CnnNNet(width,height,self._action_size,self._num_channels,self._dropout)
         elif nn_type == "cnn_small":
             return CnnNNetSmall(width, height, self._action_size, self._num_channels, self._dropout)
+        elif nn_type == "cnn_small2":
+            return CnnSmall2(width, height, self._action_size, self._num_channels)
+        elif nn_type == "cnn_small3":
+            return CnnSmall3(width, height, self._action_size, self._num_channels)
+        else:
+            raise Exception(f"No neural network type available for {nn_type}")
 
     def create_memory(self):
         return ReplayMemory(self._max_mem_size)
@@ -604,6 +695,7 @@ class DesignerZero(Designer):
 
         self.eval_threshold = eval_threshold
         self._train_iters = exp_config["train_iters"]
+        self._run_evaluator = exp_config["run_evaluator"]
         self.current_best = self.load_agent(self._agent1_config)
         self.current_player = copy.deepcopy(self.current_best)
         self.exp_id = self.load_exp_id()
@@ -726,8 +818,7 @@ class DesignerZero(Designer):
 
             print("---------- Current Player vs Current Best ____________ ")
 
-            run_evaluator = 0
-            if run_evaluator:
+            if self._run_evaluator:
                 curr_result = self.run_eval(self.current_player,self.current_best,10,iter=iter)
 
                 curr_result2 = self.run_eval(self.current_best,self.current_player,10,iter=iter)

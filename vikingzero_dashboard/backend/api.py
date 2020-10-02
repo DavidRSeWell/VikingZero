@@ -37,12 +37,12 @@ del agent_config["agent"]
 
 alphago_agent = AlphaZero(env,**agent_config)
 
-agent_model_path = "/Users/befeltingu/Documents/GitHub/VikingZero/tests/current_best_TicTacToe_179"
+agent_model_path = "/Users/befeltingu/Documents/GitHub/VikingZero/tests/current_best_TicTacToe_SAN-135"
 #agent_model_path = "/Users/befeltingu/Documents/GitHub/VikingZero/tests/current_best_Connect4_170"
 
 alphago_agent._nn.load_state_dict(torch.load(agent_model_path))
 
-alphago_agent._act_max = True
+alphago_agent._act_max = False
 
 agents = {
     "minimax":minimax_agent,
@@ -72,6 +72,8 @@ def alpha_opinion():
 
     p, v = agents["alphago"].predict(board_var)
 
+    print("Original proediction")
+    print(p.reshape((3,3)))
     print(np.where(board == 0.0))
 
     actions = env.valid_actions(board)

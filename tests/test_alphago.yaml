@@ -15,12 +15,12 @@ agent_config:
     max_mem_size: 10000
     momentum: 0.9
     n_sim: 25
-    num_channels: 84
-    network_type: "cnn_small"
+    num_channels: 512
+    network_type: "cnn"
     output_size: 7
     optimizer: Adam
     player: 1
-    t_threshold: 20
+    t_threshold: 30
     weight_decay: 0
 
   agent2:
@@ -36,4 +36,4 @@ exp_config: # experiment config
   record_every: 5 # how often to record info
   eval_iters: 5 # number of games to player during evaluation
   render: True
-  train_iters: 15
+  train_iters: 20
