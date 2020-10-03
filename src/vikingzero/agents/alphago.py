@@ -37,7 +37,7 @@ class CnnSmall3(nn.Module):
         self.num_channels = num_channels
 
         super(CnnSmall3, self).__init__()
-        self.conv1 = nn.Conv2d(1, 18, 3)
+        self.conv1 = nn.Conv2d(3, 18, 3)
         #self.pool = nn.MaxPool2d(2, 1)
         self.conv2 = nn.Conv2d(18, 16, 1)
         self.fc1 = nn.Linear(16 , 32)
@@ -45,8 +45,7 @@ class CnnSmall3(nn.Module):
         self.fc3 = nn.Linear(32, 1)
 
     def forward(self, x):
-        x[x == 2] = -1
-        x = x.view(-1, 1, self.board_y, self.board_x)
+        x = x.view(-1,self.board_y, self.board_x,3)
         x = F.relu(self.conv1(x))
         x = F.relu(self.conv2(x))
         x = F.relu(self.fc1(x.view(-1,16)))
@@ -61,7 +60,7 @@ class CnnSmall3(nn.Module):
         """
         # timing
         # preparing input
-        board = board.view(1, self.board_y, self.board_x)
+        board = board.view(1, self.board_y, self.board_x,3)
         self.eval()
         with torch.no_grad():
             pi, v = self.forward(board)
@@ -124,9 +123,9 @@ class CnnNNetSmall(nn.Module):
         self.num_channels = num_channels
 
         super(CnnNNetSmall, self).__init__()
-        self.conv1 = nn.Conv2d(1, self.num_channels, 3, stride=1, padding=1)
-        self.conv2 = nn.Conv2d(self.num_channels, self.num_channels, 3, stride=1)
-        self.conv3 = nn.Conv2d(self.num_channels, self.num_channels, 3, stride=1)
+        self.conv1 = nn.Conv2d(3, self.num_channels, 3)
+        self.conv2 = nn.Conv2d(self.num_channels, self.num_channels, 1)
+        self.conv3 = nn.Conv2d(self.num_channels, self.num_channels, 3)
 
 
         self.bn1 = nn.BatchNorm2d(self.num_channels)
@@ -143,11 +142,12 @@ class CnnNNetSmall(nn.Module):
     def forward(self, s):
         #                                                           s: batch_size x board_x x board_y
         s[s == 2] = -1
-        s = s.view(-1, 1, self.board_y, self.board_x)                # batch_size x 1 x board_x x board_y
+        s = s.view(-1,self.board_y, self.board_x,3)                # batch_size x 1 x board_x x board_y
         s = F.relu(self.bn1(self.conv1(s)))                          # batch_size x num_channels x board_x x board_y
         s = F.relu(self.bn2(self.conv2(s)))                          # batch_size x num_channels x board_x x board_y
         #s = F.relu(self.bn3(self.conv3(s)))                          # batch_size x num_channels x board_x x board_y
-        s = s.view(-1, self.num_channels*(self.board_x-2)*(self.board_y-2))
+        #s = s.view(-1, self.num_channels*(self.board_x-2)*(self.board_y-2))
+        s = s.view(-1, self.num_channels)
 
         s = F.dropout(F.relu(self.fc_bn1(self.fc1(s))), p=self.dropout, training=self.training)  # batch_size x 1024
 
@@ -162,7 +162,7 @@ class CnnNNetSmall(nn.Module):
         """
         # timing
         # preparing input
-        board = board.view(1, self.board_y, self.board_x)
+        board = board.view(1, self.board_y, self.board_x,3)
         self.eval()
         with torch.no_grad():
             pi, v = self.forward(board)
@@ -329,7 +329,7 @@ class ReplayMemory(object):
 
 class AlphaZero(MCTS):
 
-    def __init__(self,env, n_sim: int = 50, batch_size: int = 10,max_mem_size: int = 1000,
+    def __init__(self,env, augment_input: bool = True, n_sim: int = 50, batch_size: int = 10,max_mem_size: int = 1000,
                  epochs: int = 10, c: int = 1, lr: float = 0.001, epsilon: float = 0.2,input_width: int = 3, input_height: int = 3,
                  output_size: int = 9,player: int = 1,momentum: float = 0.9, network_type: str = "normal",optimizer: str = "Adam", t_threshold: int = 10
                  ,test_name: str = "current",num_channels: int = 512, dropout: float = 0.3, weight_decay: float = 0.001, eval_threshold: int = 1):
@@ -339,6 +339,7 @@ class AlphaZero(MCTS):
 
         self._action_size = output_size
         self._act_max = False
+        self._augment_input = augment_input
         self._batch_size = batch_size
         self._current_memory = [] # hold memory for current game
         self._current_moves = 0 # Track action count
@@ -449,7 +450,7 @@ class AlphaZero(MCTS):
         if self._act_max or (self._current_moves > self._t_threshold):
             #TODO clean up this mess
             # view network
-            net_view = list(zip(*[self._nn.predict(self.node_to_board(c)) for c in children]))
+            net_view = list(zip(*[self.predict(c) for c in children]))
 
             p_view = net_view[0]
             v_view = net_view[1]
@@ -508,16 +509,16 @@ class AlphaZero(MCTS):
 
         return board
 
-    def predict(self,board):
+    def predict(self,s):
+        board = self.node_to_board(s)
         return self._nn.predict(board)
 
     def processs_board(self,board):
 
-        if len(board.shape) == 2:
-            board = board.flatten()
+        board = board.reshape((self._input_height, self._input_width))
 
-        if len(board.shape) == 1:
-            board = board.reshape((1, board.shape[0]))
+        if self._augment_input:
+            board = self.transform_board(board)
 
         return board
 
@@ -552,13 +553,7 @@ class AlphaZero(MCTS):
 
         actions = self.get_valid_actions(node)
 
-        board = node.board
-
-        board = self.processs_board(board)
-
-        board = Variable(torch.from_numpy(board).type(dtype=torch.float))
-
-        p , v = self._nn.predict(board)
+        p , v = self.predict(node)
 
         #p = p.detach().numpy().reshape(self._action_size)
         # renormalize
@@ -592,9 +587,7 @@ class AlphaZero(MCTS):
             reward = node.reward()
             return (node.winner, reward)
 
-        board = self.node_to_board(node)
-
-        p,v = self._nn.predict(board)
+        p,v = self.predict(node)
 
         return (node.player,float(v))
 
@@ -678,7 +671,10 @@ class AlphaZero(MCTS):
 
         p1[board == 1] = 1
         p2[board == 2] = 1
-        p = p*self._env.check_turn(board)
+        turn = self._env.check_turn(board)
+        p = p if turn == 1 else p*-1
+        board = np.stack((p1,p2,p))
+        return board
 
     def loss_pi(self, targets, outputs):
         return -torch.sum(targets * outputs) / targets.size()[0]

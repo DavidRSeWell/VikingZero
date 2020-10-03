@@ -37,12 +37,12 @@ del agent_config["agent"]
 
 alphago_agent = AlphaZero(env,**agent_config)
 
-agent_model_path = "/Users/befeltingu/Documents/GitHub/VikingZero/tests/current_best_TicTacToe_SAN-135"
+agent_model_path = "/Users/befeltingu/Documents/GitHub/VikingZero/tests/current_best_TicTacToe_SAN-149"
 #agent_model_path = "/Users/befeltingu/Documents/GitHub/VikingZero/tests/current_best_Connect4_170"
 
 alphago_agent._nn.load_state_dict(torch.load(agent_model_path))
 
-alphago_agent._act_max = False
+alphago_agent._act_max = True
 
 agents = {
     "minimax":minimax_agent,
@@ -68,9 +68,11 @@ def alpha_opinion():
     print("BOARD")
     print(data)
     print(board)
-    board_var = Variable(torch.from_numpy(board.reshape((1,9))).type(dtype=torch.float))
+    board_t = agents["alphago"].transform_board(board.reshape((3,3)))
+    print(board_t)
+    board_var = Variable(torch.from_numpy(board_t).type(dtype=torch.float))
 
-    p, v = agents["alphago"].predict(board_var)
+    p, v = agents["alphago"]._nn.predict(board_var)
 
     print("Original proediction")
     print(p.reshape((3,3)))
@@ -93,8 +95,9 @@ def alpha_opinion():
 
     for a in actions:
         next_board = next_state(curr_board, a, int(player))
-        board_var_a = Variable(torch.from_numpy(next_board.reshape((1,9))).type(dtype=torch.float))
-        p_a, v_a = agents["alphago"].predict(board_var_a)
+        next_board = agents["alphago"].transform_board(next_board.reshape((3,3)))
+        board_var_a = Variable(torch.from_numpy(next_board).type(dtype=torch.float))
+        p_a, v_a = agents["alphago"]._nn.predict(board_var_a)
         value_board[a] = np.round(float(-1.0*v_a),2)
 
     # Get prob distribution for move
