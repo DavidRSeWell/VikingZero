@@ -37,7 +37,7 @@ del agent_config["agent"]
 
 alphago_agent = AlphaZero(env,**agent_config)
 
-agent_model_path = "/Users/befeltingu/Documents/GitHub/VikingZero/tests/current_best_TicTacToe_SAN-149"
+agent_model_path = "/Users/befeltingu/Documents/GitHub/VikingZero/tests/current_best_TicTacToe_SAN-186"
 #agent_model_path = "/Users/befeltingu/Documents/GitHub/VikingZero/tests/current_best_Connect4_170"
 
 alphago_agent._nn.load_state_dict(torch.load(agent_model_path))

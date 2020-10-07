@@ -132,7 +132,8 @@ class CnnNNetSmall(nn.Module):
         self.bn2 = nn.BatchNorm2d(self.num_channels)
         #self.bn3 = nn.BatchNorm2d(self.num_channels)
 
-        self.fc1 = nn.Linear(self.num_channels*(self.board_x-2)*(self.board_y-2), self.num_channels)
+        #self.fc1 = nn.Linear(self.num_channels*(self.board_x-2)*(self.board_y-2), self.num_channels)
+        self.fc1 = nn.Linear(self.num_channels, self.num_channels)
         self.fc_bn1 = nn.BatchNorm1d(self.num_channels)
 
         self.fc2 = nn.Linear(self.num_channels, self.action_size)
@@ -142,7 +143,7 @@ class CnnNNetSmall(nn.Module):
     def forward(self, s):
         #                                                           s: batch_size x board_x x board_y
         s[s == 2] = -1
-        s = s.view(-1,self.board_y, self.board_x,3)                # batch_size x 1 x board_x x board_y
+        s = s.view(-1,3,self.board_y, self.board_x)                # batch_size x 1 x board_x x board_y
         s = F.relu(self.bn1(self.conv1(s)))                          # batch_size x num_channels x board_x x board_y
         s = F.relu(self.bn2(self.conv2(s)))                          # batch_size x num_channels x board_x x board_y
         #s = F.relu(self.bn3(self.conv3(s)))                          # batch_size x num_channels x board_x x board_y
@@ -447,29 +448,67 @@ class AlphaZero(MCTS):
 
         child_act = np.random.choice(children, p=p_a)
 
+        s_p , s_v = self.predict(s)
+
         if self._act_max or (self._current_moves > self._t_threshold):
             #TODO clean up this mess
             # view network
             net_view = list(zip(*[self.predict(c) for c in children]))
 
-            p_view = net_view[0]
+            p_view = np.array(net_view[0])
             v_view = net_view[1]
 
-            counts = np.array([self._N[c] for c in children])
+            q_values , counts = list(zip(*[(self._Q[c],self._N[c]) for c in children]))
+            q_values = np.array(q_values)
             c = np.zeros(self._action_size)
             v = c.copy()
+            q = c.copy()
+            ucb = c.copy()
+            w = c.copy()
+            p_net = c.copy()
             c[actions] = counts
             v[actions] = v_view
-            #print(c.reshape((3,3)))
-            print(c)
-            #print(v.reshape((3,3)))
-            print(v)
-            child_act = children[np.argmax(p_a)]
+            q[actions] = q_values
+
+            if self._act_max:
+                print(f" Value of current node = {s_v}")
+
+                print("----------- COUNT ----------------")
+                print(c.reshape((self._input_height,self._input_width)))
+
+                print("----------- Values ----------------")
+                print(v.reshape((self._input_height,self._input_width)))
+
+                print("----------- MCTS Policy ----------------")
+                print(p.reshape((self._input_height, self._input_width)))
+
+                print("----------- NN Policy ----------------")
+                print(s_p.reshape((self._input_height, self._input_width)))
+
+                print("----------- Q values ---------------")
+                print(q.reshape((self._input_height,self._input_width)))
 
             bestAs = np.array(np.argwhere(counts == np.max(counts))).flatten()
             bestAs = np.random.choice(bestAs)
             child_act = children[bestAs]
             parent_act = self.get_parent_action(s,child_act)
+
+            def uct(child,Q,N,p):
+                a = self.get_parent_action(s,child)
+                value_term = Q[child] / (N[child] + 1)
+                ucb_term = self.c*p[a]*(np.sqrt(N[s]) / (1 + N[child]))
+                return value_term,ucb_term
+
+            w_term, ucb_term = list(zip(*[uct(child,self._Q,self._N,p) for child in children]))
+            w[actions] = np.array(w_term)
+            ucb[actions] = np.array(ucb_term)
+            if self._act_max:
+                print("-------------------- W Values -----------------------------")
+                print(w.reshape((self._input_height, self._input_width)))
+
+                print("-------------------- UCB Values -----------------------------")
+                print(ucb.reshape((self._input_height, self._input_width)))
+
             p = np.zeros(self._action_size)
             p[parent_act] = 1
             return parent_act, p
@@ -812,9 +851,9 @@ class DesignerZero(Designer):
                 if self._run:
                     neptune.log_metric("tot_p2_wins", p2_result)
 
-            print("---------- Current Player vs Current Best ____________ ")
 
             if self._run_evaluator:
+                print("---------- Current Player vs Current Best ____________ ")
                 curr_result = self.run_eval(self.current_player,self.current_best,10,iter=iter)
 
                 curr_result2 = self.run_eval(self.current_best,self.current_player,10,iter=iter)
@@ -833,7 +872,7 @@ class DesignerZero(Designer):
                     neptune.log_metric("currp_vs_currbest",tot_result)
 
             if self._run:
-                self.current_best.save(self.exp_id)
+                self.current_player.save(self.exp_id)
         """
         plt.plot(self.avg_loss,label="Avg total loss")
         plt.legend()
