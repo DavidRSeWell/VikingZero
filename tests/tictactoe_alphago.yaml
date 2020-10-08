@@ -8,6 +8,7 @@ agent_config:
     augment_input: true
     batch_size: 32
     c: 1
+    dirichlet_noise: 0.3
     epochs: 50
     epsilon: 0
     dropout: 0.3
@@ -16,7 +17,7 @@ agent_config:
     lr: 0.01
     max_mem_size: 2000
     momentum: 0.9
-    n_sim: 75
+    n_sim: 25
     network_type: "cnn_small"
     num_channels: 32
     output_size: 9
@@ -34,7 +35,7 @@ agent_config:
 exp_config: # experiment config
   episodes: 500
   exp_name: alphago
-  logger_type: tensorboard # what source to use for logging experiments.
+  logger_type: neptune # what source to use for logging experiments.
   record_all: true
   record_every: 5 # how often to record info
   eval_iters: 5 # number of games to player during evaluation

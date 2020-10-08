@@ -24,6 +24,8 @@ PyQtWebEngine = "^5.15.0"
 flask = "^1.1.2"
 python-dotenv = "^0.14.0"
 neptune-client = "^0.4.120"
+tensorboardX = "^2.1"
+tensorboard = "^2.3.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"

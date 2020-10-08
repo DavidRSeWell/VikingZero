@@ -1,9 +1,9 @@
 import copy
-from datetime import time
-
+import time
 import neptune
 
 from .utils import load_agent, load_env
+
 
 class Designer:
 
@@ -114,6 +114,7 @@ class Designer:
          for _ in range(iters):
              self.play_game(self._render,self.agent1,self.agent1)
 
+
 class DesignerZero(Designer):
 
     def __init__(self,env,agent_config,exp_config,_run=False, eval_threshold = 1):
@@ -127,9 +128,10 @@ class DesignerZero(Designer):
         self.current_best = self.load_agent(self._agent1_config)
         self.current_player = copy.deepcopy(self.current_best)
         self.eval_threshold = eval_threshold
-        self.exp_id = self.load_exp_id()
-
+        self.exp_id = None
         self.load_logger()
+        #self.exp_id = self.load_exp_id()
+
         ###########
         # LOSS
         ###########
@@ -153,10 +155,22 @@ class DesignerZero(Designer):
 
     def init_tensorboard(self):
         from torch.utils.tensorboard import SummaryWriter
+        #from tensorboardX import SummaryWriter
 
         exp_name = self._exp_config["exp_name"]
         # default `log_dir` is "runs" - we'll be more specific here
-        writer = SummaryWriter(f'runs/{exp_name}')
+        #writer = SummaryWriter(f'runs/{exp_name}')
+        writer = SummaryWriter()
+
+        data = {
+            "agent_config": self._agent_config,
+            "exp_config": self._exp_config
+        }
+
+        writer.add_hparams(self._exp_config,{})
+        writer.add_hparams(self._agent_config,{})
+
+        self.exp_id = 1
 
         return writer
 
@@ -180,10 +194,11 @@ class DesignerZero(Designer):
             elif logger_type == "tensorboard":
                 self._run = self.init_tensorboard()
 
+
         else:
             return
 
-    def log_metrics(self,iter):
+    def log_metrics(self,iter,iter_metrics):
 
         logger_type = self._exp_config["logger_type"]
 
@@ -191,19 +206,22 @@ class DesignerZero(Designer):
             self.log_neptune_metrics(iter)
 
         elif logger_type == "tensorboard":
-            self.log_tensorboard_metrics(iter)
+            self.log_tensorboard_metrics(iter,iter_metrics)
 
         elif logger_type == "both":
             self.log_neptune_metrics(iter)
-            self.log_tensorboard_metrics(iter)
+            self.log_tensorboard_metrics(iter,iter_metrics)
 
         return
 
     def log_neptune_metrics(self,iter):
         pass
 
-    def log_tensorboard_metrics(self,iter):
-        pass
+    def log_tensorboard_metrics(self,iter,iter_metrics):
+
+        for key , value in iter_metrics.items():
+            if value:
+                self._run.add_scalar(key,value,iter)
 
     def play_game(self,render,agent1,agent2,iter=None,game_num=0):
 
@@ -283,6 +301,10 @@ class DesignerZero(Designer):
             s_time = time.time()
             avg_total, avg_policy, avg_val = self.current_player.train_network()
 
+            iter_metrics["train_avg_loss"] = float(avg_total)
+            iter_metrics["train_policy_loss"] = float(avg_policy)
+            iter_metrics["train_val_loss"] = float(avg_val)
+
             e_time = time.time()
             min_time = (e_time - s_time) / 60.0
             print(f"Training network time ={min_time}")
@@ -297,6 +319,9 @@ class DesignerZero(Designer):
                 p2_result = self.run_eval(self.agent2, self.current_player, self._eval_iters, iter=iter)
                 p2_result *= -1
                 vs_minimax.append(p2_result)
+
+                iter_metrics["tot_p1_wins"] = p1_result
+                iter_metrics["tot_p2_wins"] = p2_result
 
             print("---------- Current Player vs Current Best ____________ ")
 
@@ -320,8 +345,7 @@ class DesignerZero(Designer):
             self.log_metrics(iter,iter_metrics)
 
             if self._save_model:
-                self.current_best.save()
-
+                self.current_best.save(self.exp_id)
 
     def run_eval(self,agent1,agent2,iters,render=False,iter=None):
 

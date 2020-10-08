@@ -182,10 +182,10 @@ class CnnNNet(nn.Module):
         self.num_channels = num_channels
 
         super(CnnNNet, self).__init__()
-        self.conv1 = nn.Conv2d(1, self.num_channels, 2, stride=1, padding=1)
-        self.conv2 = nn.Conv2d(self.num_channels, self.num_channels, 2, stride=1, padding=1)
-        self.conv3 = nn.Conv2d(self.num_channels, self.num_channels, 2, stride=1)
-        self.conv4 = nn.Conv2d(self.num_channels, self.num_channels, 2, stride=1)
+        self.conv1 = nn.Conv2d(3, self.num_channels, 3, stride=1, padding=1)
+        self.conv2 = nn.Conv2d(self.num_channels, self.num_channels, 3, stride=1, padding=1)
+        self.conv3 = nn.Conv2d(self.num_channels, self.num_channels, 3, stride=1)
+        self.conv4 = nn.Conv2d(self.num_channels, self.num_channels, 3, stride=1)
 
         self.bn1 = nn.BatchNorm2d(self.num_channels)
         self.bn2 = nn.BatchNorm2d(self.num_channels)
@@ -205,7 +205,7 @@ class CnnNNet(nn.Module):
     def forward(self, s):
         #                                                           s: batch_size x board_x x board_y
         s[s == 2] = -1
-        s = s.view(-1, 1, self.board_x, self.board_y)                # batch_size x 1 x board_x x board_y
+        s = s.view(-1, self.num_channels, self.board_x, self.board_y)                # batch_size x 1 x board_x x board_y
         s = F.relu(self.bn1(self.conv1(s)))                          # batch_size x num_channels x board_x x board_y
         s = F.relu(self.bn2(self.conv2(s)))                          # batch_size x num_channels x board_x x board_y
         s = F.relu(self.bn3(self.conv3(s)))                          # batch_size x num_channels x (board_x-2) x (board_y-2)
@@ -227,7 +227,7 @@ class CnnNNet(nn.Module):
         # timing
         # preparing input
         #board = torch.FloatTensor(board.astype(np.float64))
-        board = board.view(1, self.board_x, self.board_y)
+        board = board.view(self.num_channels, self.board_x, self.board_y)
         self.eval()
         with torch.no_grad():
             pi, v = self.forward(board)
@@ -333,7 +333,8 @@ class AlphaZero(MCTS):
     def __init__(self,env, augment_input: bool = True, n_sim: int = 50, batch_size: int = 10,max_mem_size: int = 1000,
                  epochs: int = 10, c: int = 1, lr: float = 0.001, epsilon: float = 0.2,input_width: int = 3, input_height: int = 3,
                  output_size: int = 9,player: int = 1,momentum: float = 0.9, network_type: str = "normal",optimizer: str = "Adam", t_threshold: int = 10
-                 ,test_name: str = "current",num_channels: int = 512, dropout: float = 0.3, weight_decay: float = 0.001, eval_threshold: int = 1):
+                 ,test_name: str = "current",num_channels: int = 512, dropout: float = 0.3, weight_decay: float = 0.001,
+                 eval_threshold: int = 1, dirichlet_noise: float = 0.3):
         super().__init__(c)
 
         self.player = player
@@ -344,6 +345,7 @@ class AlphaZero(MCTS):
         self._batch_size = batch_size
         self._current_memory = [] # hold memory for current game
         self._current_moves = 0 # Track action count
+        self._dir_noise = dirichlet_noise
         self._dropout = dropout
         self._env = env
         self._epochs = epochs
@@ -473,20 +475,38 @@ class AlphaZero(MCTS):
             if self._act_max:
                 print(f" Value of current node = {s_v}")
 
-                print("----------- COUNT ----------------")
-                print(c.reshape((self._input_height,self._input_width)))
+                if self._env.name == "TicTacToe":
 
-                print("----------- Values ----------------")
-                print(v.reshape((self._input_height,self._input_width)))
+                    print("----------- COUNT ----------------")
+                    print(c.reshape((self._input_height,self._input_width)))
 
-                print("----------- MCTS Policy ----------------")
-                print(p.reshape((self._input_height, self._input_width)))
+                    print("----------- Values ----------------")
+                    print(v.reshape((self._input_height,self._input_width)))
 
-                print("----------- NN Policy ----------------")
-                print(s_p.reshape((self._input_height, self._input_width)))
+                    print("----------- MCTS Policy ----------------")
+                    print(p.reshape((self._input_height, self._input_width)))
 
-                print("----------- Q values ---------------")
-                print(q.reshape((self._input_height,self._input_width)))
+                    print("----------- NN Policy ----------------")
+                    print(s_p.reshape((self._input_height, self._input_width)))
+
+                    print("----------- Q values ---------------")
+                    print(q.reshape((self._input_height,self._input_width)))
+                else:
+
+                    print("----------- COUNT ----------------")
+                    print(c)
+
+                    print("----------- Values ----------------")
+                    print(v)
+
+                    print("----------- MCTS Policy ----------------")
+                    print(p)
+
+                    print("----------- NN Policy ----------------")
+                    print(s_p)
+
+                    print("----------- Q values ---------------")
+                    print(q)
 
             bestAs = np.array(np.argwhere(counts == np.max(counts))).flatten()
             bestAs = np.random.choice(bestAs)
@@ -503,11 +523,19 @@ class AlphaZero(MCTS):
             w[actions] = np.array(w_term)
             ucb[actions] = np.array(ucb_term)
             if self._act_max:
-                print("-------------------- W Values -----------------------------")
-                print(w.reshape((self._input_height, self._input_width)))
 
-                print("-------------------- UCB Values -----------------------------")
-                print(ucb.reshape((self._input_height, self._input_width)))
+                if self._env.name == "TicTacToe":
+                    print("-------------------- W Values -----------------------------")
+                    print(w.reshape((self._input_height, self._input_width)))
+
+                    print("-------------------- UCB Values -----------------------------")
+                    print(ucb.reshape((self._input_height, self._input_width)))
+                else:
+                    print("-------------------- W Values -----------------------------")
+                    print(w)
+
+                    print("-------------------- UCB Values -----------------------------")
+                    print(ucb)
 
             p = np.zeros(self._action_size)
             p[parent_act] = 1
@@ -605,7 +633,7 @@ class AlphaZero(MCTS):
         if node.root:
             dir_noise = np.zeros(self._action_size)
 
-            dir_noise[actions] = np.random.dirichlet([0.3]*len(actions))
+            dir_noise[actions] = np.random.dirichlet([self._dir_noise]*len(actions))
 
             p = (1 - self._epsilon)*p + self._epsilon*dir_noise
 
