@@ -194,10 +194,23 @@ class Connect4(gym.Env):
             return 1
 
     @staticmethod
+    def is_win(board):
+        #TODO Get rid of this by synch methods with tictactoe
+        return Connect4.check_winner(board)
+
+    @staticmethod
     def valid_actions(s: np.array) -> np.array:
         """
         :param s: numpy array of the state
         :return: numpy array representing the set of valid actions
         """
+
+        if len(s.shape) == 1:
+            s = s.reshape((6,7))
         return np.where(s[0,:] == 0)[0]
+
+
+    @staticmethod
+    def actions(s: np.array) -> np.array:
+        return Connect4.valid_actions(s)
 

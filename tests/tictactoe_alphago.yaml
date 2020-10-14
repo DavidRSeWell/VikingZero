@@ -7,7 +7,7 @@ agent_config:
     agent: AlphaZero
     augment_input: true
     batch_size: 32
-    c: 1
+    c: 1.41
     dirichlet_noise: 0.3
     epochs: 50
     epsilon: 0
@@ -17,8 +17,9 @@ agent_config:
     lr: 0.01
     max_mem_size: 2000
     momentum: 0.9
-    n_sim: 25
-    network_type: "cnn_small"
+    n_sim: 75
+    network_path: ""
+    network_type: "cnn_small3"
     num_channels: 32
     output_size: 9
     optimizer: Adam
@@ -36,6 +37,8 @@ exp_config: # experiment config
   episodes: 500
   exp_name: alphago
   logger_type: neptune # what source to use for logging experiments.
+  neptune_api_token: eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vdWkubmVwdHVuZS5haSIsImFwaV91cmwiOiJodHRwczovL3VpLm5lcHR1bmUuYWkiLCJhcGlfa2V5IjoiYThhM2FkNmItNGJmOC00NTc3LWI1ZDctNmE1NTYxMDBmMzkyIn0=
+  neptune_name: befeltingu/sandbox
   record_all: true
   record_every: 5 # how often to record info
   eval_iters: 5 # number of games to player during evaluation

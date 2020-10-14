@@ -153,6 +153,10 @@ class DesignerZero(Designer):
 
         neptune.create_experiment(exp_name,params=data)
 
+        self.exp_id = neptune.get_experiment().id
+
+        return neptune.get_experiment()
+
     def init_tensorboard(self):
         from torch.utils.tensorboard import SummaryWriter
         #from tensorboardX import SummaryWriter
@@ -203,19 +207,21 @@ class DesignerZero(Designer):
         logger_type = self._exp_config["logger_type"]
 
         if logger_type == "neptune":
-            self.log_neptune_metrics(iter)
+            self.log_neptune_metrics(iter,iter_metrics)
 
         elif logger_type == "tensorboard":
             self.log_tensorboard_metrics(iter,iter_metrics)
 
         elif logger_type == "both":
-            self.log_neptune_metrics(iter)
+            self.log_neptune_metrics(iter,iter_metrics)
             self.log_tensorboard_metrics(iter,iter_metrics)
 
         return
 
-    def log_neptune_metrics(self,iter):
-        pass
+    def log_neptune_metrics(self,iter,iter_metrics):
+        for key , value in iter_metrics.items():
+            if value:
+                neptune.log_metric(key,value)
 
     def log_tensorboard_metrics(self,iter,iter_metrics):
 
@@ -301,9 +307,10 @@ class DesignerZero(Designer):
             s_time = time.time()
             avg_total, avg_policy, avg_val = self.current_player.train_network()
 
-            iter_metrics["train_avg_loss"] = float(avg_total)
-            iter_metrics["train_policy_loss"] = float(avg_policy)
-            iter_metrics["train_val_loss"] = float(avg_val)
+            iter_metrics["Total Loss"] = avg_total
+            iter_metrics["Policy loss"] = avg_policy
+            iter_metrics["Value loss"] = avg_val
+
 
             e_time = time.time()
             min_time = (e_time - s_time) / 60.0
@@ -345,7 +352,10 @@ class DesignerZero(Designer):
             self.log_metrics(iter,iter_metrics)
 
             if self._save_model:
-                self.current_best.save(self.exp_id)
+                if self._run_evaluator:
+                    self.current_best.save(self.exp_id)
+                else:
+                    self.current_player.save(self.exp_id)
 
     def run_eval(self,agent1,agent2,iters,render=False,iter=None):
 

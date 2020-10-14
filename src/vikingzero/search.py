@@ -35,11 +35,19 @@ class MCTS:
         :return:
         """
         winner,r = reward
+        #print("----------------Final state -----------------------")
+        #print(path[-1].board.reshape((3, 3)))
+        #print(f"Winner = {winner}")
+        #print(f"reward = {r}")
         for node in reversed(path):
+            #print("----------BOARD --------------")
+            #print(node.board.reshape((3,3)))
             self._N[node] += 1
             if node.player != winner: # this only works if losing is 0 loss
+                #print("Reward for board is +r")
                 self._Q[node] += r
             else:
+                #print("Reward for board is -r")
                 self._Q[node] -= r
 
     def expand(self,node):

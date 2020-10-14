@@ -115,6 +115,7 @@ class CnnSmall2(nn.Module):
 
 
 class CnnNNetSmall(nn.Module):
+
     def __init__(self,width, height,  action_size, num_channels,dropout):
         # game params
         self.action_size = action_size
@@ -123,16 +124,12 @@ class CnnNNetSmall(nn.Module):
         self.num_channels = num_channels
 
         super(CnnNNetSmall, self).__init__()
-        self.conv1 = nn.Conv2d(3, self.num_channels, 3)
-        self.conv2 = nn.Conv2d(self.num_channels, self.num_channels, 1)
-        self.conv3 = nn.Conv2d(self.num_channels, self.num_channels, 3)
-
+        self.conv1 = nn.Conv2d(3, self.num_channels, 3,padding=2)
+        self.conv2 = nn.Conv2d(self.num_channels, self.num_channels, 5)
 
         self.bn1 = nn.BatchNorm2d(self.num_channels)
         self.bn2 = nn.BatchNorm2d(self.num_channels)
-        #self.bn3 = nn.BatchNorm2d(self.num_channels)
 
-        #self.fc1 = nn.Linear(self.num_channels*(self.board_x-2)*(self.board_y-2), self.num_channels)
         self.fc1 = nn.Linear(self.num_channels, self.num_channels)
         self.fc_bn1 = nn.BatchNorm1d(self.num_channels)
 
@@ -146,8 +143,6 @@ class CnnNNetSmall(nn.Module):
         s = s.view(-1,3,self.board_y, self.board_x)                # batch_size x 1 x board_x x board_y
         s = F.relu(self.bn1(self.conv1(s)))                          # batch_size x num_channels x board_x x board_y
         s = F.relu(self.bn2(self.conv2(s)))                          # batch_size x num_channels x board_x x board_y
-        #s = F.relu(self.bn3(self.conv3(s)))                          # batch_size x num_channels x board_x x board_y
-        #s = s.view(-1, self.num_channels*(self.board_x-2)*(self.board_y-2))
         s = s.view(-1, self.num_channels)
 
         s = F.dropout(F.relu(self.fc_bn1(self.fc1(s))), p=self.dropout, training=self.training)  # batch_size x 1024
@@ -204,7 +199,6 @@ class CnnNNet(nn.Module):
 
     def forward(self, s):
         #                                                           s: batch_size x board_x x board_y
-        s[s == 2] = -1
         s = s.view(-1, self.num_channels, self.board_x, self.board_y)                # batch_size x 1 x board_x x board_y
         s = F.relu(self.bn1(self.conv1(s)))                          # batch_size x num_channels x board_x x board_y
         s = F.relu(self.bn2(self.conv2(s)))                          # batch_size x num_channels x board_x x board_y
@@ -334,7 +328,7 @@ class AlphaZero(MCTS):
                  epochs: int = 10, c: int = 1, lr: float = 0.001, epsilon: float = 0.2,input_width: int = 3, input_height: int = 3,
                  output_size: int = 9,player: int = 1,momentum: float = 0.9, network_type: str = "normal",optimizer: str = "Adam", t_threshold: int = 10
                  ,test_name: str = "current",num_channels: int = 512, dropout: float = 0.3, weight_decay: float = 0.001,
-                 eval_threshold: int = 1, dirichlet_noise: float = 0.3):
+                 eval_threshold: int = 1, dirichlet_noise: float = 0.3, network_path: str = ""):
         super().__init__(c)
 
         self.player = player
@@ -355,6 +349,7 @@ class AlphaZero(MCTS):
         self._input_width = input_width
         self._max_mem_size = max_mem_size
         self._memory = self.create_memory()
+        self._network_path = network_path
         self._num_channels = num_channels
         self._nn = self.create_model(input_width,input_height,output_size,network_type)
         self._n_sim = n_sim
@@ -405,18 +400,24 @@ class AlphaZero(MCTS):
     def create_model(self,width,height,output_size,nn_type):
 
         if nn_type == "normal":
-            input_size = width*height
+            input_size = width*height*3
             return Network(input_size,output_size)
         elif nn_type == "cnn":
-            return CnnNNet(width,height,self._action_size,self._num_channels,self._dropout)
+            model =  CnnNNet(width,height,self._action_size,self._num_channels,self._dropout)
         elif nn_type == "cnn_small":
-            return CnnNNetSmall(width, height, self._action_size, self._num_channels, self._dropout)
+            model =  CnnNNetSmall(width, height, self._action_size, self._num_channels, self._dropout)
         elif nn_type == "cnn_small2":
-            return CnnSmall2(width, height, self._action_size, self._num_channels)
+            model =  CnnSmall2(width, height, self._action_size, self._num_channels)
         elif nn_type == "cnn_small3":
-            return CnnSmall3(width, height, self._action_size, self._num_channels)
+            model =  CnnSmall3(width, height, self._action_size, self._num_channels)
         else:
             raise Exception(f"No neural network type available for {nn_type}")
+
+        if len(self._network_path) > 1:
+            print("Loading model from disk")
+            model.load_state_dict(torch.load(self._network_path))
+
+        return model
 
     def create_memory(self):
         return ReplayMemory(self._max_mem_size)
@@ -611,6 +612,28 @@ class AlphaZero(MCTS):
 
         self.children = dict()
 
+    def reverse_transform(self,board):
+        """
+        Take board state from transformed state back to original state
+        :param board:
+        :return:
+        """
+
+        board_original = np.zeros((self._input_height*self._input_width,))
+
+        # first board in transformed board is player 1
+        p1_actions = np.where(board[0].flatten() == 1)[0]
+        #if len(p1_actions) > 0:
+        #    p1_actions = p1_actions[0]
+        board_original[p1_actions] = 1
+        p2_actions = np.where(board[1].flatten() == 1)[0]
+        #if len(p2_actions) > 0:
+        #    p2_actions = p2_actions[0]
+
+        board_original[p2_actions] = 2
+
+        return board_original
+
     def save(self,id):
         torch.save(self._nn.state_dict(), f"current_best_{self._env.name}_{id}")
 
@@ -658,6 +681,23 @@ class AlphaZero(MCTS):
 
         return (node.player,float(v))
 
+    def show_data_sample(self,sample):
+        """
+        Method to help get a visual on batch of training data
+        :param sample:
+        :return:
+        """
+
+        for data in sample:
+            b , p , v = data
+
+            board = self.reverse_transform(b)
+            print("-----------------BOARD---------------------")
+            print(board.reshape((3,3)))
+            print("MCTS PROBS")
+            print(p.reshape((3,3)))
+            print(f"Value = {v}")
+
     def store_memory(self,z):
         """
         Take result from game and
@@ -667,7 +707,8 @@ class AlphaZero(MCTS):
         #z = torch.IntTensor(z)
         for mem in self._current_memory:
 
-            p_turn = self._env.check_turn(mem.state)
+            board = self.reverse_transform(mem.state)
+            p_turn = self._env.check_turn(board)
 
             if z == -1:
                 mem.z = 0.0001
@@ -689,6 +730,20 @@ class AlphaZero(MCTS):
             self._memory.push(mem)
         self.reset_current_memory()
 
+    def view_current_memory(self):
+
+        last_n = 20
+        data = self._memory.memory[-last_n:]
+
+        for d in data:
+            b,p,v = d.state,d.action_mcts,d.z
+            board = self.reverse_transform(b)
+            print("-----------------BOARD---------------------")
+            print(board.reshape((3, 3)))
+            print("MCTS PROBS")
+            print(p.reshape((3, 3)))
+            print(f"Value = {v}")
+
     def train_network(self):
 
         self._nn.train()
@@ -699,6 +754,8 @@ class AlphaZero(MCTS):
         avg_total = 0
         avg_value = 0
         avg_policy = 0
+
+        #self.view_current_memory()
 
         for _ in range(self._epochs):
 
@@ -732,6 +789,7 @@ class AlphaZero(MCTS):
         self._act_max = False
 
     def transform_board(self,board):
+        #board = board.reshape((self._input_height,self._input_width))
         p1 = np.zeros(board.shape)
         p2 = np.zeros(board.shape)
         p = np.ones(board.shape)
