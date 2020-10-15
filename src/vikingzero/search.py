@@ -34,7 +34,7 @@ class MCTS:
         to the current leaf node
         :return:
         """
-        winner,r = reward
+        current_player,r = reward
         #print("----------------Final state -----------------------")
         #print(path[-1].board.reshape((3, 3)))
         #print(f"Winner = {winner}")
@@ -43,8 +43,7 @@ class MCTS:
             #print("----------BOARD --------------")
             #print(node.board.reshape((3,3)))
             self._N[node] += 1
-            if node.player != winner: # this only works if losing is 0 loss
-                #print("Reward for board is +r")
+            if node.player != current_player: # this only works if losing is 0 loss
                 self._Q[node] += r
             else:
                 #print("Reward for board is -r")

@@ -17,9 +17,9 @@ agent_config:
     lr: 0.01
     max_mem_size: 2000
     momentum: 0.9
-    n_sim: 75
+    n_sim: 25
     network_path: ""
-    network_type: "cnn_small3"
+    network_type: "cnn_small"
     num_channels: 32
     output_size: 9
     optimizer: Adam

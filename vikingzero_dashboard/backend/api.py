@@ -18,103 +18,129 @@ from vikingzero.utils import load_agent
 
 app = Flask(__name__)
 
-env = TicTacToe()
-#env = Connect4()
+envs = {
+    "tictactoe": TicTacToe(),
+    "connect4": Connect4()
 
-minimax_agent = TicTacToeMinMax(env,player=2,type="alphabeta")
-#minimax_agent = Connect4MinMax(env,player=2,type="alphabeta",depth=2,n_sims=5)
-
-config_path = "/Users/befeltingu/Documents/GitHub/VikingZero/tests/tictactoe_alphago.yaml"
-#config_path = "/Users/befeltingu/Documents/GitHub/VikingZero/tests/test_alphago.yaml"
-
-config_file = load_config_file(config_path)
-
-agent_config = config_file["agent_config"]["agent1"]
-
-agent_name = agent_config["agent"]
-
-del agent_config["agent"]
-
-alphago_agent = AlphaZero(env,**agent_config)
-
-agent_model_path = "/Users/befeltingu/Documents/GitHub/VikingZero/tests/current_best_TicTacToe_SAN-186"
-#agent_model_path = "/Users/befeltingu/Documents/GitHub/VikingZero/tests/current_best_Connect4_170"
-
-alphago_agent._nn.load_state_dict(torch.load(agent_model_path))
-
-alphago_agent._act_max = True
-
-agents = {
-    "minimax":minimax_agent,
-    "alphago":alphago_agent
 }
 
-def next_state(state,action,player):
-    actions = TicTacToe.actions(state)
+minimax_tictactoe_agent = TicTacToeMinMax(envs["tictactoe"],player=2,type="alphabeta")
+minimax_connect4_agent = Connect4MinMax(envs["connect4"],player=2,type="alphabeta",depth=2,n_sims=5)
+
+test_path = "/Users/befeltingu/Documents/GitHub/VikingZero/tests/"
+tictactoe_config_path = test_path + "tictactoe_alphago.yaml"
+connect4_config_path = test_path + "test_alphago.yaml"
+
+def load_agent(env,config_path,agent_model_name):
+
+    config_file = load_config_file(config_path)
+
+    agent_config = config_file["agent_config"]["agent1"]
+
+    agent_name = agent_config["agent"]
+
+    del agent_config["agent"]
+
+    agent =  AlphaZero(env,**agent_config)
+
+    agent_model_path = "/Users/befeltingu/Documents/GitHub/VikingZero/tests/" + agent_model_name
+
+    agent._nn.load_state_dict(torch.load(agent_model_path))
+
+    agent._act_max = False
+
+    return agent
+
+tictactoe_agent = load_agent(envs["tictactoe"],tictactoe_config_path,agent_model_name="current_best_TicTacToe_SAN-279")
+connect4_agent = load_agent(envs["connect4"],connect4_config_path,agent_model_name="current_best_Connect4_SAN-216")
+
+
+def next_state(env_name,state,action,player):
+
+    env = envs[env_name]
+
+    actions = env.actions(state)
     if len(actions) == 0:
         print("The current state is a terminal state cannot get next state")
         return state
 
-    next_state = state.copy()
-    next_state[action] = player
-    return next_state
+    next_s = state.copy()
+    if env_name == "connect4":
+        next_s = next_s.reshape((6,7))
+        row = env.process_move(next_s,action)
+        next_s[row,action] = player
+    else:
+        next_s[action] = player
+
+    return next_s.flatten()
+
+agents = {
+    "tictactoe": {
+        "minimax": minimax_tictactoe_agent,
+        "alphago": tictactoe_agent
+    },
+    "connect4": {
+        "minimax": minimax_connect4_agent,
+        "alphago": connect4_agent
+    }
+}
 
 @app.route("/alpha_opinion", methods=["Post","Get"])
 def alpha_opinion():
+
     data = request.get_json()
     player = int(data["player"])
     board = data["board"]
     board = json_to_board(board)
-    print("BOARD")
-    print(data)
-    print(board)
-    board_t = agents["alphago"].transform_board(board.reshape((3,3)))
-    print(board_t)
+    env_name = data["env_name"].lower()
+    env = envs[env_name]
+    board = board.reshape((env.board.shape))
+    agent = agents[env_name]["alphago"]
+    action_size = agent._action_size
+    board_t = agent.transform_board(board)
+
     board_var = Variable(torch.from_numpy(board_t).type(dtype=torch.float))
 
-    p, v = agents["alphago"]._nn.predict(board_var)
-
-    print("Original proediction")
-    print(p.reshape((3,3)))
-    print(np.where(board == 0.0))
+    p, v = agent._nn.predict(board_var)
 
     actions = env.valid_actions(board)
 
-    print("Valid actions")
-    print(actions)
-    p[[a for a in range(agents["alphago"]._action_size) if a not in actions]] = 0
-    print(p)
+    p[[a for a in range(agent._action_size) if a not in actions]] = 0
+
     p = p / p.sum()
-    print(p)
 
     curr_board = board.copy()
-    if env.name == "TicTacToe":
-        value_board = [0 for _ in range(9)]
-    elif env.name == "Connect4":
-        value_board = [0 for _ in range(42)]
+    value_board = [0 for _ in range(action_size)]
 
     for a in actions:
-        next_board = next_state(curr_board, a, int(player))
-        next_board = agents["alphago"].transform_board(next_board.reshape((3,3)))
+        next_board = next_state(env_name,curr_board, a, int(player))
+        next_board = agent.transform_board(next_board)
         board_var_a = Variable(torch.from_numpy(next_board).type(dtype=torch.float))
-        p_a, v_a = agents["alphago"]._nn.predict(board_var_a)
+        p_a, v_a = agent._nn.predict(board_var_a)
         value_board[a] = np.round(float(-1.0*v_a),2)
 
     # Get prob distribution for move
-    agents["alphago"].reset()
-    action , p_a = agents["alphago"].act(board)
-    print("returning request")
-    print(value_board)
+    agent.reset()
+
+    action , p_a = agent.act(board)
+
     return {"p":p.tolist(), "v": value_board, "mcts_p":p_a.tolist()}
 
+@app.route("/is_win",methods=["Post","Get"])
+def is_win():
+    data = request.get_json()
+    board = data["board"]
+    env_name = data["env_name"].lower()
+    env = envs[env_name]
+    board = json_to_board(board)
+    board = board.reshape(env.board.shape)
+    win = env.is_win(board)
+    return {"win":win} ,201
 
 @app.route("/make_move",methods=["Post","Get"])
 def make_move():
 
     move_data = request.get_json()
-
-    print("Move data")
-    print(move_data)
 
     action = move_data["action"]
 
@@ -124,41 +150,69 @@ def make_move():
 
     agent_type = move_data["agent"]
 
-    agent = agents[agent_type]
+    env_name = move_data["env_name"].lower()
+
+    env = envs[env_name]
+
+    agent = agents[env_name][agent_type]
 
     env.board = board
 
     env.current_player = player
 
-    curr_state, action, next_state, winner = env.step(action)
+    curr_state, action, next_s, winner = env.step(action)
     if winner:
-        next_board = board_to_json(next_state)
+        next_board = board_to_json(next_s)
         return {"board": next_board, "winner": winner}, 201
 
     if agent_type == "alphago":
         agent.reset()
         agent._act_max = True
 
-    a = agent.act(next_state)
+    a = agent.act(next_s)
     if type(a) == tuple:
         a,p_a = a
 
-    curr_state, action, next_state, winner = env.step(a)
+    curr_state, action, next_s, winner = env.step(a)
 
-    next_board = board_to_json(next_state)
+    next_board = board_to_json(next_s)
 
     return {"board": next_board, "winner":winner} , 201
-
 
 @app.route("/new_game",methods=["Post"])
 def new_game():
 
     move_data = request.get_json()
 
+    env_name = move_data["env_name"].lower()
 
-    env.reset()
+    envs[env_name].reset()
 
     return {}, 201
+
+@app.route("/get_next_state", methods=["Post","Get"])
+def get_next_state():
+
+    move_data = request.get_json()
+
+    action = move_data["action"]
+
+    board = json_to_board(move_data["board"])
+
+    env_name = move_data["env_name"].lower()
+
+    if env_name == "connect4":
+        action = board_index_to_col(action)
+
+    env = envs[env_name]
+
+    player = env.check_turn(board)
+
+    env.board = board
+
+    next_board = next_state(env_name,board,action,player)
+
+    return {"board": board_to_json(next_board) }, 201
 
 
 def board_to_json(board):
@@ -176,6 +230,14 @@ def board_to_json(board):
     return board
 
 
+def board_index_to_col(action):
+    a = np.zeros((42,))
+    a[action] = 1
+    b = a.reshape((6,7))
+    action = int(np.where(b == 1)[1])
+    return action
+
+
 def json_to_board(board):
 
     board = list(board)
@@ -189,3 +251,24 @@ def json_to_board(board):
             board[idx] = 0
 
     return np.array(board)
+
+def create_json_tree(agent,node):
+    """
+    From the current node create a json tree that we can
+    pass back to front end
+    :param node:
+    :return:
+    """
+
+    tree = {}
+
+    node_num = 0
+
+    def update_tree(node):
+        pass
+
+    for key,value in agent.children.items():
+        pass
+
+
+

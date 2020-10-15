@@ -125,7 +125,7 @@ class CnnNNetSmall(nn.Module):
 
         super(CnnNNetSmall, self).__init__()
         self.conv1 = nn.Conv2d(3, self.num_channels, 3,padding=2)
-        self.conv2 = nn.Conv2d(self.num_channels, self.num_channels, 5)
+        self.conv2 = nn.Conv2d(self.num_channels, self.num_channels,5)
 
         self.bn1 = nn.BatchNorm2d(self.num_channels)
         self.bn2 = nn.BatchNorm2d(self.num_channels)
@@ -634,6 +634,17 @@ class AlphaZero(MCTS):
 
         return board_original
 
+    def reward(self,leaf_node):
+
+        winner = leaf_node.winner
+        if winner == -1:
+            return 0
+
+        if winner == leaf_node.player:
+            return 1
+        else:
+            return -1
+
     def save(self,id):
         torch.save(self._nn.state_dict(), f"current_best_{self._env.name}_{id}")
 
@@ -674,10 +685,12 @@ class AlphaZero(MCTS):
     def simulate(self,node):
 
         if node.is_terminal():
-            reward = node.reward()
-            return (node.winner, reward)
+            #reward = node.reward()
+            reward = self.reward(node)
+            return (node.player, reward)
 
         p,v = self.predict(node)
+        #winner = 1 if node.player == 2 else 2
 
         return (node.player,float(v))
 
@@ -711,23 +724,29 @@ class AlphaZero(MCTS):
             p_turn = self._env.check_turn(board)
 
             if z == -1:
-                mem.z = 0.0001
+                mem.z = 0.000001
                 #mem.z = 0
-            elif p_turn != z: # if winner != player of node
-                mem.z = -1
-            elif p_turn == z:
+            elif p_turn == z: # if winner != player of node
                 mem.z = 1
+            elif p_turn != z:
+                mem.z = -1
             else:
                 raise Exception("Incorrect winner passed")
+
             """
             if z == 2:
                 print("player 2 won")
+            print("--------- MEM STATE ----------------")
+            #print(mem.state.reshape((self._input_height, self._input_width)))
+            print(mem.state)
             print("--------- BOARD STATE ----------------")
-            print(mem.state.reshape((self._input_height, self._input_width)))
+            print(board.reshape((3,3)))
             print(f"Turn = {p_turn}")
-            print(f"z = {mem.z}")
+            print(f"z = {z}")
+            print(f"mem.z = {mem.z}")
             """
             self._memory.push(mem)
+
         self.reset_current_memory()
 
     def view_current_memory(self):
@@ -768,6 +787,7 @@ class AlphaZero(MCTS):
             state = torch.FloatTensor(b)
 
             p, v = self._nn(state)
+
             loss_value = self.loss_v(target_v,v)
 
             loss_policy = self.loss_pi(target_p, p)
