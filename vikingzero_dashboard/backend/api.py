@@ -31,7 +31,7 @@ test_path = "/Users/befeltingu/Documents/GitHub/VikingZero/tests/"
 tictactoe_config_path = test_path + "tictactoe_alphago.yaml"
 connect4_config_path = test_path + "test_alphago.yaml"
 
-def load_agent(env,config_path,agent_model_name):
+def load_agent2(env,config_path,agent_model_name):
 
     config_file = load_config_file(config_path)
 
@@ -51,8 +51,8 @@ def load_agent(env,config_path,agent_model_name):
 
     return agent
 
-tictactoe_agent = load_agent(envs["tictactoe"],tictactoe_config_path,agent_model_name="current_best_TicTacToe_SAN-279")
-connect4_agent = load_agent(envs["connect4"],connect4_config_path,agent_model_name="current_best_Connect4_SAN-216")
+tictactoe_agent = load_agent2(envs["tictactoe"],tictactoe_config_path,agent_model_name="current_best_TicTacToe_SAN-279")
+connect4_agent = load_agent2(envs["connect4"],connect4_config_path,agent_model_name="current_best_Connect4_SAN-216")
 
 
 def next_state(env_name,state,action,player):
@@ -260,12 +260,33 @@ def create_json_tree(agent,node):
     :return:
     """
 
-    tree = {}
+    children = agent.children[node]
 
+    tree = {
+        "name": "0",
+        "children": [
+
+        ]
+    }
+
+    keys = {
+        node: 0
+    }
     node_num = 0
 
-    def update_tree(node):
-        pass
+    def update_tree(node,parent):
+        curr_children = node.get_children()
+        if node not in keys:
+            node_num += 1
+            keys[node] = node_num
+
+
+        for child in curr_children:
+            if child in keys:
+
+
+
+
 
     for key,value in agent.children.items():
         pass

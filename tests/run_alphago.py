@@ -9,8 +9,8 @@ NEPTUNE_API_TOKEN="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vdWkubmVwdHVuZS5haSIsImFwaV91c
 
 neptune.init('befeltingu/sandbox',api_token=NEPTUNE_API_TOKEN)
 
-yaml_file = "tictactoe_alphago.yaml"
-#yaml_file = "test_alphago.yaml"
+#yaml_file = "tictactoe_alphago.yaml"
+yaml_file = "test_alphago.yaml"
 
 # Load experiment variables
 with open(yaml_file) as f:

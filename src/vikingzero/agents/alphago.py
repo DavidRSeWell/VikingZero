@@ -125,10 +125,13 @@ class CnnNNetSmall(nn.Module):
 
         super(CnnNNetSmall, self).__init__()
         self.conv1 = nn.Conv2d(3, self.num_channels, 3,padding=2)
-        self.conv2 = nn.Conv2d(self.num_channels, self.num_channels,5)
+        self.conv2 = nn.Conv2d(self.num_channels, self.num_channels,5,padding=2)
+        self.conv3 = nn.Conv2d(self.num_channels, self.num_channels,5)
+
 
         self.bn1 = nn.BatchNorm2d(self.num_channels)
         self.bn2 = nn.BatchNorm2d(self.num_channels)
+        self.bn3 = nn.BatchNorm2d(self.num_channels)
 
         self.fc1 = nn.Linear(self.num_channels, self.num_channels)
         self.fc_bn1 = nn.BatchNorm1d(self.num_channels)
@@ -143,6 +146,7 @@ class CnnNNetSmall(nn.Module):
         s = s.view(-1,3,self.board_y, self.board_x)                # batch_size x 1 x board_x x board_y
         s = F.relu(self.bn1(self.conv1(s)))                          # batch_size x num_channels x board_x x board_y
         s = F.relu(self.bn2(self.conv2(s)))                          # batch_size x num_channels x board_x x board_y
+        s = F.relu(self.bn3(self.conv3(s)))                          # batch_size x num_channels x board_x x board_y
         s = s.view(-1, self.num_channels)
 
         s = F.dropout(F.relu(self.fc_bn1(self.fc1(s))), p=self.dropout, training=self.training)  # batch_size x 1024
@@ -158,7 +162,7 @@ class CnnNNetSmall(nn.Module):
         """
         # timing
         # preparing input
-        board = board.view(1, self.board_y, self.board_x,3)
+        #board = board.view(1, self.board_y, self.board_x,3)
         self.eval()
         with torch.no_grad():
             pi, v = self.forward(board)
@@ -199,7 +203,7 @@ class CnnNNet(nn.Module):
 
     def forward(self, s):
         #                                                           s: batch_size x board_x x board_y
-        s = s.view(-1, self.num_channels, self.board_x, self.board_y)                # batch_size x 1 x board_x x board_y
+        s = s.view(-1, 3, self.board_x, self.board_y)                # batch_size x 1 x board_x x board_y
         s = F.relu(self.bn1(self.conv1(s)))                          # batch_size x num_channels x board_x x board_y
         s = F.relu(self.bn2(self.conv2(s)))                          # batch_size x num_channels x board_x x board_y
         s = F.relu(self.bn3(self.conv3(s)))                          # batch_size x num_channels x (board_x-2) x (board_y-2)
@@ -221,7 +225,7 @@ class CnnNNet(nn.Module):
         # timing
         # preparing input
         #board = torch.FloatTensor(board.astype(np.float64))
-        board = board.view(self.num_channels, self.board_x, self.board_y)
+        #board = board.view(-1, self.board_x, self.board_y)
         self.eval()
         with torch.no_grad():
             pi, v = self.forward(board)
@@ -720,7 +724,9 @@ class AlphaZero(MCTS):
         #z = torch.IntTensor(z)
         for mem in self._current_memory:
 
-            board = self.reverse_transform(mem.state)
+            board = mem.state
+            if self._augment_input:
+                board = self.reverse_transform(mem.state)
             p_turn = self._env.check_turn(board)
 
             if z == -1:
