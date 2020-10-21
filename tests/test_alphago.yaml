@@ -8,7 +8,7 @@ agent_config:
     augment_input: true
     batch_size: 64
     c: 1.41
-    epochs: 24
+    epochs: 25
     epsilon: 0
     dropout: 0.3
     input_width: 7
@@ -17,7 +17,7 @@ agent_config:
     max_mem_size: 50000
     momentum: 0.9
     n_sim: 25
-    network_path: ""
+    network_path: "/Users/befeltingu/Documents/GitHub/VikingZero/tests/current_best_Connect4_SAN-359"
     network_type: "cnn"
     num_channels: 64
     output_size: 7
@@ -46,4 +46,4 @@ exp_config: # experiment config
   render: true
   run_evaluator: false
   save_model: true
-  train_iters: 100 
+  train_iters: 100
