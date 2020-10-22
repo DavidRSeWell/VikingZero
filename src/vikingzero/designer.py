@@ -1,143 +1,21 @@
 import copy
 import time
+import matplotlib.pyplot as plt
 import neptune
 
 from .utils import load_agent, load_env
 
 
-class Designer:
-
-    def __init__(self,env,agent_config,exp_config,_run=False):
-
-        self._agent1_config = agent_config["agent1"]
-        self._agent2_config = agent_config["agent2"]
-        self._eval_iters = exp_config["eval_iters"]
-        self._iters = exp_config["episodes"]
-        self._record_all = exp_config["record_all"]
-        self._record_every = exp_config["record_every"]
-        self._render = exp_config["render"]
-        self._run = _run # Comes from sacred library to track the run
-
-        self.env = env
-        self.agent1 = self.load_agent(self._agent1_config)
-        self.agent2 = self.load_agent(self._agent2_config)
-
-    def load_agent(self,agent_config):
-        """
-        Instantiate an agent from its configuration
-        :param agent_config: dict
-        :return: class
-        """
-        agent_config = agent_config.copy()
-        agent_name = agent_config["agent"]
-        del agent_config["agent"]
-        Agent = load_agent(agent_name)
-        agent = Agent(self.env, **agent_config)
-        return agent
-
-    def play_game(self,render,agent1,agent2,iter=None):
-
-        self.env.reset()
-
-        curr_player = agent1
-
-        game_array = []
-
-        while True:
-
-            action = curr_player.act(self.env.board)
-
-            if self._record_all:
-                curr_board = self.env.board.copy()
-                b_hash = hash((curr_board.tobytes(),))
-                #self._run.info[f"action_iter={iter}_{b_hash}"] = (curr_board.tolist(),int(action))
-
-            curr_state, action, next_state, r = self.env.step(action)
-
-            if render:
-                game_array.append(self.env.board.copy().tolist())
-                self.env.render()
-
-            if r != 0:
-                if self._record_all:
-                    #self._run.info[f"game_{iter}_result"] = r
-                    pass
-                break
-
-            curr_player = agent2 if curr_player == agent1 else agent1
-
-        if render:
-            #self._run.info[f"game_{iter}"] = game_array
-            pass
-
-        return self.env.winner
-
-    def run(self):
-        """
-        :param _run: Used in conjunction with sacred for recording tests
-        :return:
-        """
-
-        for iter in range(self._iters):
-            print(f"Running iteration {iter}")
-
-            if (iter % self._record_every) == 0 or (iter == self._iters - 1):
-
-                r = self.run_eval(iter=iter)
-
-                self._run.log_scalar(r"tot_wins",r)
-
-            #TODO Allow for self-play as a setting
-            self.play_game(False,self.agent1,self.agent2,iter)
-
-    def run_eval(self,iter=None):
-        """
-        This method evaluates the current agent
-        :return:
-        """
-        result = 0
-        for i in range(self._eval_iters):
-            if i == 0:
-                winner = self.play_game(self._render,self.agent1,self.agent2,iter=iter)
-            else:
-                winner = self.play_game(self._render,self.agent1,self.agent2)
-
-            if winner == 2:
-                result -= 1
-            elif winner == 1:
-                result += 1
-
-        return result
-
-    def train(self,iters):
-
-         for _ in range(iters):
-             self.play_game(self._render,self.agent1,self.agent1)
-
-
-class DesignerZero(Designer):
-
-    def __init__(self,env,agent_config,exp_config,_run=False, eval_threshold = 1):
-        super().__init__(env,agent_config,exp_config, _run=_run)
-
-        self._agent_config = agent_config
+class ExpLogger:
+    """
+    Class for containing functionality
+    dealing with the handling of experiment data
+    during and after an experiment is run. Acts as a go
+    between for the designer and experiment data.
+    """
+    def __init__(self,exp_config):
         self._exp_config = exp_config
-        self._run_evaluator = exp_config["run_evaluator"]
-        self._save_model = exp_config["save_model"]
-        self._train_iters = exp_config["train_iters"]
-        self.current_best = self.load_agent(self._agent1_config)
-        self.current_player = copy.deepcopy(self.current_best)
-        self.eval_threshold = eval_threshold
-        self.exp_id = None
-        self.load_logger()
-        #self.exp_id = self.load_exp_id()
-
-        ###########
-        # LOSS
-        ###########
-        self.avg_loss = []
-        self.avg_value_loss = []
-        self.avg_policy_loss = []
+        self._exp_metrics = {}
 
     def init_neptune(self):
         neptune_api_token = self._exp_config["neptune_api_token"]
@@ -190,7 +68,8 @@ class DesignerZero(Designer):
     def load_logger(self):
 
         logger_type = self._exp_config["logger_type"]
-        if logger_type:
+
+        if type(logger_type) == str:
             if logger_type == "neptune":
                 self.init_neptune()
                 self._run = neptune.get_experiment()
@@ -198,16 +77,26 @@ class DesignerZero(Designer):
             elif logger_type == "tensorboard":
                 self._run = self.init_tensorboard()
 
+            else:
+                raise Exception(f"Unknown logger type {logger_type} given")
 
         else:
+            print(f"Running without logger {logger_type} passed")
             return
 
+    def log_metric(self,key,value):
+        self._exp_metrics[key].append(value)
+
     def log_metrics(self,iter,iter_metrics):
+
+        if len(self._exp_metrics.keys()) == 0:
+            for k , v in iter_metrics.items():
+                self._exp_metrics[k] = []
 
         logger_type = self._exp_config["logger_type"]
 
         if logger_type == "neptune":
-            self.log_neptune_metrics(iter,iter_metrics)
+            self.log_neptune_metrics(iter_metrics)
 
         elif logger_type == "tensorboard":
             self.log_tensorboard_metrics(iter,iter_metrics)
@@ -216,9 +105,13 @@ class DesignerZero(Designer):
             self.log_neptune_metrics(iter,iter_metrics)
             self.log_tensorboard_metrics(iter,iter_metrics)
 
+        # Log to self iter_metric regardless of logger type
+        for k, v in iter_metrics.items():
+            self.log_metric(k,v)
+
         return
 
-    def log_neptune_metrics(self,iter,iter_metrics):
+    def log_neptune_metrics(self,iter_metrics):
         for key , value in iter_metrics.items():
             if value:
                 neptune.log_metric(key,value)
@@ -228,6 +121,147 @@ class DesignerZero(Designer):
         for key , value in iter_metrics.items():
             if value:
                 self._run.add_scalar(key,value,iter)
+
+    def plot_metrics(self):
+        for k,v in self._exp_metrics.items():
+            plt.plot(self._exp_metrics[k])
+            plt.title(k)
+            plt.legend()
+            plt.show()
+
+
+class Designer:
+
+    def __init__(self,env,agent_config,exp_config):
+
+        self._agent1_config = agent_config["agent1"]
+        self._agent2_config = agent_config["agent2"]
+        self._eval_iters = exp_config["eval_iters"]
+        self._iters = exp_config["episodes"]
+        self._record_all = exp_config["record_all"]
+        self._record_every = exp_config["record_every"]
+        self._render = exp_config["render"]
+        self._train_iters = exp_config["train_iters"]
+
+        self.env = env
+        self.exp_logger = ExpLogger(exp_config)
+        self.agent1 = self.load_agent(self._agent1_config)
+        self.agent2 = self.load_agent(self._agent2_config)
+
+    def load_agent(self,agent_config):
+        """
+        Instantiate an agent from its configuration
+        :param agent_config: dict
+        :return: class
+        """
+        agent_config = agent_config.copy()
+        agent_name = agent_config["agent"]
+        del agent_config["agent"]
+        Agent = load_agent(agent_name)
+        agent = Agent(self.env, **agent_config)
+        return agent
+
+    def play_game(self,render,agent1,agent2,iter=None):
+
+        self.env.reset()
+
+        curr_player = agent1
+
+        game_array = []
+
+        while True:
+
+            action = curr_player.act(self.env.board)
+
+            curr_state, action, next_state, r = self.env.step(action)
+
+            if render:
+                game_array.append(self.env.board.copy().tolist())
+                self.env.render()
+
+            if r != 0:
+               break
+
+            curr_player = agent2 if curr_player == agent1 else agent1
+
+        return self.env.winner
+
+    def run(self):
+        """
+        :param _run: Used in conjunction with sacred for recording tests
+        :return:
+        """
+
+        for iter in range(self._iters):
+            print(f"Running iteration {iter}")
+            iter_metrics = {
+                "tot_p1_wins": None,
+                "tot_p2_wins": None
+            }
+
+            if (iter % self._record_every) == 0 or (iter == self._iters - 1):
+
+                p1_r = self.run_eval(self.agent1,self.agent2,self._eval_iters,render=self._render,iter=iter)
+                p2_r = self.run_eval(self.agent2,self.agent1,self._eval_iters,render=self._render,iter=iter)
+
+                iter_metrics["tot_p1_wins"] = p1_r
+                iter_metrics["tot_p2_wins"] = p2_r
+
+                self.exp_logger.log_metrics(iter,iter_metrics)
+
+            #TODO Allow for self-play as a setting
+            self.train(self._train_iters)
+
+        return self.exp_logger
+
+    def run_eval(self,agent1,agent2,iters,render=False,iter=None):
+        """
+        This method evaluates the current agent
+        :return:
+        """
+        result = 0
+        for i in range(self._eval_iters):
+            if i == 0:
+                winner = self.play_game(self._render,self.agent1,self.agent2,iter=iter)
+            else:
+                winner = self.play_game(self._render,self.agent1,self.agent2)
+
+            if winner == 2:
+                result -= 1
+            elif winner == 1:
+                result += 1
+
+        return result
+
+    def train(self,iters):
+
+         for _ in range(iters):
+             self.play_game(False,self.agent1,self.agent1)
+
+
+class DesignerZero(Designer):
+
+    def __init__(self,env,agent_config,exp_config,_run=False):
+        super().__init__(env,agent_config,exp_config, _run=_run)
+
+        self._agent_config = agent_config
+        self._exp_config = exp_config
+        self._run_evaluator = exp_config["run_evaluator"]
+        self._save_model = exp_config["save_model"]
+        self._train_iters = exp_config["train_iters"]
+        self.current_best = self.load_agent(self._agent1_config)
+        self.current_player = copy.deepcopy(self.current_best)
+        self.eval_threshold = exp_config["eval_threshold"]
+        self.exp_id = None
+        self.load_logger()
+        #self.exp_id = self.load_exp_id()
+
+        ###########
+        # LOSS
+        ###########
+        self.avg_loss = []
+        self.avg_value_loss = []
+        self.avg_policy_loss = []
 
     def play_game(self,render,agent1,agent2,iter=None,game_num=0):
 
@@ -292,7 +326,6 @@ class DesignerZero(Designer):
                 "train_policy_loss":None,
                 "tot_p1_wins":None,
                 "tot_p2_wins":None,
-
 
             }
 
