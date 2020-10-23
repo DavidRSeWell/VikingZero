@@ -13,9 +13,13 @@ class ExpLogger:
     during and after an experiment is run. Acts as a go
     between for the designer and experiment data.
     """
-    def __init__(self,exp_config):
+    def __init__(self,exp_config,agent_config):
+        self._agent_config = agent_config
         self._exp_config = exp_config
         self._exp_metrics = {}
+        self._run = None
+
+        self.load_logger()
 
     def init_neptune(self):
         neptune_api_token = self._exp_config["neptune_api_token"]
@@ -36,10 +40,10 @@ class ExpLogger:
         return neptune.get_experiment()
 
     def init_tensorboard(self):
-        from torch.utils.tensorboard import SummaryWriter
-        #from tensorboardX import SummaryWriter
+        #from torch.utils.tensorboard import SummaryWriter
+        from tensorboardX import SummaryWriter
 
-        exp_name = self._exp_config["exp_name"]
+        #exp_name = self._exp_config["exp_name"]
         # default `log_dir` is "runs" - we'll be more specific here
         #writer = SummaryWriter(f'runs/{exp_name}')
         writer = SummaryWriter()
@@ -51,8 +55,6 @@ class ExpLogger:
 
         writer.add_hparams(self._exp_config,{})
         writer.add_hparams(self._agent_config,{})
-
-        self.exp_id = 1
 
         return writer
 
@@ -144,7 +146,7 @@ class Designer:
         self._train_iters = exp_config["train_iters"]
 
         self.env = env
-        self.exp_logger = ExpLogger(exp_config)
+        self.exp_logger = ExpLogger(exp_config,agent_config)
         self.agent1 = self.load_agent(self._agent1_config)
         self.agent2 = self.load_agent(self._agent2_config)
 
