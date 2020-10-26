@@ -1,3 +1,8 @@
+"""
+Module to assist in creating an instantiated class based on
+passed parameters from an end user
+"""
+
 
 def load_agent(name):
 

@@ -318,6 +318,3 @@ def test_connect_4_valid_actions():
     print("PASSED Valid actions")
 
 
-if __name__ == "__main__":
-    test_connect_4_valid_actions()
-

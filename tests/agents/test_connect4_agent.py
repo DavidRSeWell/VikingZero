@@ -64,33 +64,12 @@ def test_designer():
 
     designer.run(render=True)
 
+    agent1_path = ""
+    agent2_path = ""
     # save
-    f = open("/Users/befeltingu/Documents/GitHub/VikingZero/tests/saved_agents/alpha_beta_connect4_p1","wb")
-    f2 = open("/Users/befeltingu/Documents/GitHub/VikingZero/tests/saved_agents/alpha_beta_connect4_p2","wb")
+    f = open(f"{agent1_path}","wb")
+    f2 = open(f"{agent2_path}","wb")
     pickle.dump(designer.agent1,f)
     pickle.dump(designer.agent2,f2)
-
-
-if __name__ == "__main__":
-
-    test_designer()
-
-
-    test_load_agent = 0
-    if test_load_agent:
-
-        board = np.zeros((6, 7))
-
-        f = open("/Users/befeltingu/Documents/GitHub/VikingZero/tests/saved_agents/alpha_beta_connect4_p1", "rb")
-
-        agent1 = pickle.load(f)
-
-        a = agent1.act(board)
-
-        print("Done testing load agent")
-
-
-
-
 
 

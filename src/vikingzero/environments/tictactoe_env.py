@@ -2,7 +2,7 @@ import gym
 import numpy as np
 
 
-class TicTacToe:
+class TicTacToe(gym.Env):
     """
     This class handles all the logic of running a tic tac
     toe game. It expects as input two players which themselves
@@ -10,6 +10,7 @@ class TicTacToe:
     action the player wants to take. The players can either
     be bots or humans
     """
+    metadata = {'render.modes': ['human']}
 
     def __init__(self,display_board=False):
 
@@ -89,7 +90,7 @@ class TicTacToe:
 
         self.current_player = 1
 
-    def render(self):
+    def render(self, mode="human"):
         board_dict = {f"s{i}": int(self.board[i - 1]) for i in range(1, 10)}
         board_str = str(self.board_string.format(**board_dict))
         print(board_str)

@@ -13,13 +13,19 @@ from vikingzero.designer import DesignerZero,Designer
 
 def run_agent(config):
 
+    assert (type(config) == str) or (type(config) == dict)
+
     data = None
 
-    if config.split(".")[-1] == "yaml":
-        print("Processing Yaml Config File")
+    if type(config) == str:
+        if config.split(".")[-1] == "yaml":
+            print("Processing Yaml Config File")
 
-        with open(config) as f:
-            data = yaml.load(f, Loader=yaml.FullLoader)
+            with open(config) as f:
+                data = yaml.load(f, Loader=yaml.FullLoader)
+
+    elif type(config) == dict:
+        data = config
 
     print("----------------PASSED PARAMS -----------------------")
     print(json.dumps(data, indent=4, sort_keys=True))
@@ -34,7 +40,10 @@ def run_agent(config):
 
     designer = None
 
-    if "AlphaZero" in agent_config:
+    agent1 = agent_config["agent1"]["agent"]
+    agent2 = agent_config["agent2"]["agent"]
+
+    if "AlphaZero" in (agent1, agent2):
         print("Running AlphaGO Zero Experiment. Loading Appropriate designer")
         designer = DesignerZero
     else:
@@ -50,6 +59,4 @@ def run_agent(config):
         exp_logger.plot_metrics()
 
     print("Showing results")
-
-
 

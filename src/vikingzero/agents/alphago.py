@@ -1,6 +1,9 @@
 import copy
 import matplotlib.pyplot as plt
-import neptune
+try:
+    import neptune
+except:
+    pass
 import numpy as np
 import random
 import time
@@ -28,91 +31,6 @@ class Memory:
     action_mcts: np.array
     value: np.float
     z: np.float
-
-class CnnSmall3(nn.Module):
-    def __init__(self,width, height,  action_size, num_channels):
-        # game params
-        self.action_size = action_size
-        self.board_x, self.board_y = width, height
-        self.num_channels = num_channels
-
-        super(CnnSmall3, self).__init__()
-        self.conv1 = nn.Conv2d(3, 18, 3)
-        #self.pool = nn.MaxPool2d(2, 1)
-        self.conv2 = nn.Conv2d(18, 16, 1)
-        self.fc1 = nn.Linear(16 , 32)
-        self.fc2 = nn.Linear(32, 9)
-        self.fc3 = nn.Linear(32, 1)
-
-    def forward(self, x):
-        x = x.view(-1,self.board_y, self.board_x,3)
-        x = F.relu(self.conv1(x))
-        x = F.relu(self.conv2(x))
-        x = F.relu(self.fc1(x.view(-1,16)))
-        pi = self.fc2(x)  # batch_size x action_size
-        v = self.fc3(x)  # batch_size x 1
-
-        return F.log_softmax(pi, dim=1), torch.tanh(v)
-
-    def predict(self, board):
-        """
-        board: np array with board
-        """
-        # timing
-        # preparing input
-        board = board.view(1, self.board_y, self.board_x,3)
-        self.eval()
-        with torch.no_grad():
-            pi, v = self.forward(board)
-
-        p,v =  torch.exp(pi).data.cpu().numpy()[0], v.data.cpu().numpy()[0]
-
-        return p,v[0]
-
-
-class CnnSmall2(nn.Module):
-    def __init__(self,width, height,  action_size, num_channels):
-        # game params
-        self.action_size = action_size
-        self.board_x, self.board_y = width, height
-        self.num_channels = num_channels
-
-        super(CnnSmall2, self).__init__()
-        self.conv1 = nn.Conv2d(1, self.num_channels, 3)
-
-        self.fc1 = nn.Linear(self.num_channels, 9)
-
-        self.fc2 = nn.Linear(9, self.action_size)
-
-        self.fc3 = nn.Linear(9, 1)
-
-    def forward(self, s):
-        #                                                           s: batch_size x board_x x board_y
-        s[s == 2] = -1
-        s = s.view(-1, 1, self.board_y, self.board_x)                # batch_size x 1 x board_x x board_y
-        s = F.relu(self.conv1(s))                       # batch_size x num_channels x board_x x board_y
-        s = s.view(-1,self.num_channels)
-        s = F.relu(self.fc1(s))
-        pi = self.fc2(s)                                                                         # batch_size x action_size
-        v = self.fc3(s)                                                                          # batch_size x 1
-
-        return F.log_softmax(pi, dim=1), torch.tanh(v)
-
-    def predict(self, board):
-        """
-        board: np array with board
-        """
-        # timing
-        # preparing input
-        board = board.view(1, self.board_y, self.board_x)
-        self.eval()
-        with torch.no_grad():
-            pi, v = self.forward(board)
-
-        p,v =  torch.exp(pi).data.cpu().numpy()[0], v.data.cpu().numpy()[0]
-
-        return p,v[0]
-
 
 class CnnNNetSmall(nn.Module):
 
@@ -410,10 +328,6 @@ class AlphaZero(MCTS):
             model =  CnnNNet(width,height,self._action_size,self._num_channels,self._dropout)
         elif nn_type == "cnn_small":
             model =  CnnNNetSmall(width, height, self._action_size, self._num_channels, self._dropout)
-        elif nn_type == "cnn_small2":
-            model =  CnnSmall2(width, height, self._action_size, self._num_channels)
-        elif nn_type == "cnn_small3":
-            model =  CnnSmall3(width, height, self._action_size, self._num_channels)
         else:
             raise Exception(f"No neural network type available for {nn_type}")
 
@@ -478,40 +392,41 @@ class AlphaZero(MCTS):
             q[actions] = q_values
 
             if self._act_max:
-                print(f" Value of current node = {s_v}")
+                if 1 == 0:
+                    print(f" Value of current node = {s_v}")
 
-                if self._env.name == "TicTacToe":
+                    if self._env.name == "TicTacToe":
 
-                    print("----------- COUNT ----------------")
-                    print(c.reshape((self._input_height,self._input_width)))
+                        print("----------- COUNT ----------------")
+                        print(c.reshape((self._input_height,self._input_width)))
 
-                    print("----------- Values ----------------")
-                    print(v.reshape((self._input_height,self._input_width)))
+                        print("----------- Values ----------------")
+                        print(v.reshape((self._input_height,self._input_width)))
 
-                    print("----------- MCTS Policy ----------------")
-                    print(p.reshape((self._input_height, self._input_width)))
+                        print("----------- MCTS Policy ----------------")
+                        print(p.reshape((self._input_height, self._input_width)))
 
-                    print("----------- NN Policy ----------------")
-                    print(s_p.reshape((self._input_height, self._input_width)))
+                        print("----------- NN Policy ----------------")
+                        print(s_p.reshape((self._input_height, self._input_width)))
 
-                    print("----------- Q values ---------------")
-                    print(q.reshape((self._input_height,self._input_width)))
-                else:
+                        print("----------- Q values ---------------")
+                        print(q.reshape((self._input_height,self._input_width)))
+                    else:
 
-                    print("----------- COUNT ----------------")
-                    print(c)
+                        print("----------- COUNT ----------------")
+                        print(c)
 
-                    print("----------- Values ----------------")
-                    print(v)
+                        print("----------- Values ----------------")
+                        print(v)
 
-                    print("----------- MCTS Policy ----------------")
-                    print(p)
+                        print("----------- MCTS Policy ----------------")
+                        print(p)
 
-                    print("----------- NN Policy ----------------")
-                    print(s_p)
+                        print("----------- NN Policy ----------------")
+                        print(s_p)
 
-                    print("----------- Q values ---------------")
-                    print(q)
+                        print("----------- Q values ---------------")
+                        print(q)
 
             bestAs = np.array(np.argwhere(counts == np.max(counts))).flatten()
             bestAs = np.random.choice(bestAs)
@@ -529,18 +444,19 @@ class AlphaZero(MCTS):
             ucb[actions] = np.array(ucb_term)
             if self._act_max:
 
-                if self._env.name == "TicTacToe":
-                    print("-------------------- W Values -----------------------------")
-                    print(w.reshape((self._input_height, self._input_width)))
+                if 1 == 0:
+                    if self._env.name == "TicTacToe":
+                        print("-------------------- W Values -----------------------------")
+                        print(w.reshape((self._input_height, self._input_width)))
 
-                    print("-------------------- UCB Values -----------------------------")
-                    print(ucb.reshape((self._input_height, self._input_width)))
-                else:
-                    print("-------------------- W Values -----------------------------")
-                    print(w)
+                        print("-------------------- UCB Values -----------------------------")
+                        print(ucb.reshape((self._input_height, self._input_width)))
+                    else:
+                        print("-------------------- W Values -----------------------------")
+                        print(w)
 
-                    print("-------------------- UCB Values -----------------------------")
-                    print(ucb)
+                        print("-------------------- UCB Values -----------------------------")
+                        print(ucb)
 
             p = np.zeros(self._action_size)
             p[parent_act] = 1

@@ -42,7 +42,6 @@ def render(board):
 
 create_test_board_1(BOARD_1)
 
-
 def test_islegal():
 
     env = TicTacToe()
@@ -130,23 +129,6 @@ def test_win():
     assert TicTacToe.is_win(BOARD_0) == 0
 
     print("Passed test_win")
-
-
-
-if __name__ == "__main__":
-
-
-    #test_win()
-    #draw_board = create_draw_board(BOARD_0)
-
-    #render(draw_board)
-
-    #test_step()
-
-    test_draw()
-
-    test_win()
-
 
 
 

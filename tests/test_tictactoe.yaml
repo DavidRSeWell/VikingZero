@@ -16,7 +16,7 @@ agent_config:
 exp_config: # experiment config
   episodes: 15
   eval_iters: 1 # number of games to player during evaluation
-  logger_type: tensorboard
+  logger_type: false
   plot_data: true
   record_all: true
   record_every: 1 # how often to record info

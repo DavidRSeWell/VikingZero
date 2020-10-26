@@ -1,7 +1,14 @@
 import copy
 import time
 import matplotlib.pyplot as plt
-import neptune
+
+from tqdm import tqdm
+
+# code in place if someone wants to use neptune to track
+try:
+    import neptune
+except:
+    pass
 
 from .utils import load_agent, load_env
 
@@ -53,8 +60,8 @@ class ExpLogger:
             "exp_config": self._exp_config
         }
 
-        writer.add_hparams(self._exp_config,{})
-        writer.add_hparams(self._agent_config,{})
+        #writer.add_hparams(self._exp_config,{})
+        #writer.add_hparams(self._agent_config,{})
 
         return writer
 
@@ -194,7 +201,7 @@ class Designer:
         :return:
         """
 
-        for iter in range(self._iters):
+        for iter in tqdm(range(self._iters)):
             print(f"Running iteration {iter}")
             iter_metrics = {
                 "tot_p1_wins": None,
@@ -243,8 +250,8 @@ class Designer:
 
 class DesignerZero(Designer):
 
-    def __init__(self,env,agent_config,exp_config,_run=False):
-        super().__init__(env,agent_config,exp_config, _run=_run)
+    def __init__(self,env,agent_config,exp_config):
+        super().__init__(env,agent_config,exp_config)
 
         self._agent_config = agent_config
         self._exp_config = exp_config
@@ -255,7 +262,7 @@ class DesignerZero(Designer):
         self.current_player = copy.deepcopy(self.current_best)
         self.eval_threshold = exp_config["eval_threshold"]
         self.exp_id = None
-        self.load_logger()
+        self.exp_logger = ExpLogger(exp_config,agent_config)
         #self.exp_id = self.load_exp_id()
 
         ###########
@@ -318,14 +325,14 @@ class DesignerZero(Designer):
 
         vs_minimax = []
         vs_best = []
-        for iter in range(self._iters):
+        for iter in tqdm(range(self._iters)):
 
             print(f"Running iteration {iter}")
 
             iter_metrics = {
-                "train_avg_loss":None,
-                "train_val_loss":None,
-                "train_policy_loss":None,
+                "Total Loss":None,
+                "Value Loss":None,
+                "Policy Loss":None,
                 "tot_p1_wins":None,
                 "tot_p2_wins":None,
 
@@ -343,8 +350,8 @@ class DesignerZero(Designer):
             avg_total, avg_policy, avg_val = self.current_player.train_network()
 
             iter_metrics["Total Loss"] = avg_total
-            iter_metrics["Policy loss"] = avg_policy
-            iter_metrics["Value loss"] = avg_val
+            iter_metrics["Policy Loss"] = avg_policy
+            iter_metrics["Value Loss"] = avg_val
 
 
             e_time = time.time()
@@ -384,13 +391,14 @@ class DesignerZero(Designer):
                     self.current_player = copy.deepcopy(self.current_best)
 
             # Record metrics each iteration
-            self.log_metrics(iter,iter_metrics)
+            self.exp_logger.log_metrics(iter,iter_metrics)
 
             if self._save_model:
                 if self._run_evaluator:
                     self.current_best.save(self.exp_id)
                 else:
                     self.current_player.save(self.exp_id)
+        return self.exp_logger
 
     def run_eval(self,agent1,agent2,iters,render=False,iter=None):
 
