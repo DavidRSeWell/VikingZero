@@ -1,13 +1,147 @@
 import copy
 import time
-import neptune
+import matplotlib.pyplot as plt
+
+from tqdm import tqdm
+
+# code in place if someone wants to use neptune to track
+try:
+    import neptune
+except:
+    pass
 
 from .utils import load_agent, load_env
 
 
+class ExpLogger:
+    """
+    Class for containing functionality
+    dealing with the handling of experiment data
+    during and after an experiment is run. Acts as a go
+    between for the designer and experiment data.
+    """
+    def __init__(self,exp_config,agent_config):
+        self._agent_config = agent_config
+        self._exp_config = exp_config
+        self._exp_metrics = {}
+        self._run = None
+
+        self.load_logger()
+
+    def init_neptune(self):
+        neptune_api_token = self._exp_config["neptune_api_token"]
+        neptune_name = self._exp_config["neptune_name"]
+        exp_name = self._exp_config["exp_name"]
+
+        data = {
+            "agent_config": self._agent_config,
+            "exp_config": self._exp_config
+        }
+
+        neptune.init(neptune_name,api_token=neptune_api_token)
+
+        neptune.create_experiment(exp_name,params=data)
+
+        self.exp_id = neptune.get_experiment().id
+
+        return neptune.get_experiment()
+
+    def init_tensorboard(self):
+        #from torch.utils.tensorboard import SummaryWriter
+        from tensorboardX import SummaryWriter
+
+        #exp_name = self._exp_config["exp_name"]
+        # default `log_dir` is "runs" - we'll be more specific here
+        #writer = SummaryWriter(f'runs/{exp_name}')
+        writer = SummaryWriter()
+
+        data = {
+            "agent_config": self._agent_config,
+            "exp_config": self._exp_config
+        }
+
+        #writer.add_hparams(self._exp_config,{})
+        #writer.add_hparams(self._agent_config,{})
+
+        return writer
+
+    def load_exp_id(self):
+        if self._run:
+            return self._run.id
+        else:
+            try:
+                return neptune.get_experiment().id
+            except:
+                return None
+
+    def load_logger(self):
+
+        logger_type = self._exp_config["logger_type"]
+
+        if type(logger_type) == str:
+            if logger_type == "neptune":
+                self.init_neptune()
+                self._run = neptune.get_experiment()
+
+            elif logger_type == "tensorboard":
+                self._run = self.init_tensorboard()
+
+            else:
+                raise Exception(f"Unknown logger type {logger_type} given")
+
+        else:
+            print(f"Running without logger {logger_type} passed")
+            return
+
+    def log_metric(self,key,value):
+        self._exp_metrics[key].append(value)
+
+    def log_metrics(self,iter,iter_metrics):
+
+        if len(self._exp_metrics.keys()) == 0:
+            for k , v in iter_metrics.items():
+                self._exp_metrics[k] = []
+
+        logger_type = self._exp_config["logger_type"]
+
+        if logger_type == "neptune":
+            self.log_neptune_metrics(iter_metrics)
+
+        elif logger_type == "tensorboard":
+            self.log_tensorboard_metrics(iter,iter_metrics)
+
+        elif logger_type == "both":
+            self.log_neptune_metrics(iter,iter_metrics)
+            self.log_tensorboard_metrics(iter,iter_metrics)
+
+        # Log to self iter_metric regardless of logger type
+        for k, v in iter_metrics.items():
+            self.log_metric(k,v)
+
+        return
+
+    def log_neptune_metrics(self,iter_metrics):
+        for key , value in iter_metrics.items():
+            if value:
+                neptune.log_metric(key,value)
+
+    def log_tensorboard_metrics(self,iter,iter_metrics):
+
+        for key , value in iter_metrics.items():
+            if value:
+                self._run.add_scalar(key,value,iter)
+
+    def plot_metrics(self):
+        for k,v in self._exp_metrics.items():
+            plt.plot(self._exp_metrics[k])
+            plt.title(k)
+            plt.legend()
+            plt.show()
+
+
 class Designer:
 
-    def __init__(self,env,agent_config,exp_config,_run=False):
+    def __init__(self,env,agent_config,exp_config):
 
         self._agent1_config = agent_config["agent1"]
         self._agent2_config = agent_config["agent2"]
@@ -16,9 +150,10 @@ class Designer:
         self._record_all = exp_config["record_all"]
         self._record_every = exp_config["record_every"]
         self._render = exp_config["render"]
-        self._run = _run # Comes from sacred library to track the run
+        self._train_iters = exp_config["train_iters"]
 
         self.env = env
+        self.exp_logger = ExpLogger(exp_config,agent_config)
         self.agent1 = self.load_agent(self._agent1_config)
         self.agent2 = self.load_agent(self._agent2_config)
 
@@ -47,11 +182,6 @@ class Designer:
 
             action = curr_player.act(self.env.board)
 
-            if self._record_all:
-                curr_board = self.env.board.copy()
-                b_hash = hash((curr_board.tobytes(),))
-                #self._run.info[f"action_iter={iter}_{b_hash}"] = (curr_board.tolist(),int(action))
-
             curr_state, action, next_state, r = self.env.step(action)
 
             if render:
@@ -59,16 +189,9 @@ class Designer:
                 self.env.render()
 
             if r != 0:
-                if self._record_all:
-                    #self._run.info[f"game_{iter}_result"] = r
-                    pass
-                break
+               break
 
             curr_player = agent2 if curr_player == agent1 else agent1
-
-        if render:
-            #self._run.info[f"game_{iter}"] = game_array
-            pass
 
         return self.env.winner
 
@@ -78,19 +201,29 @@ class Designer:
         :return:
         """
 
-        for iter in range(self._iters):
+        for iter in tqdm(range(self._iters)):
             print(f"Running iteration {iter}")
+            iter_metrics = {
+                "tot_p1_wins": None,
+                "tot_p2_wins": None
+            }
 
             if (iter % self._record_every) == 0 or (iter == self._iters - 1):
 
-                r = self.run_eval(iter=iter)
+                p1_r = self.run_eval(self.agent1,self.agent2,self._eval_iters,render=self._render,iter=iter)
+                p2_r = self.run_eval(self.agent2,self.agent1,self._eval_iters,render=self._render,iter=iter)
 
-                self._run.log_scalar(r"tot_wins",r)
+                iter_metrics["tot_p1_wins"] = p1_r
+                iter_metrics["tot_p2_wins"] = p2_r
+
+                self.exp_logger.log_metrics(iter,iter_metrics)
 
             #TODO Allow for self-play as a setting
-            self.play_game(False,self.agent1,self.agent2,iter)
+            self.train(self._train_iters)
 
-    def run_eval(self,iter=None):
+        return self.exp_logger
+
+    def run_eval(self,agent1,agent2,iters,render=False,iter=None):
         """
         This method evaluates the current agent
         :return:
@@ -112,13 +245,13 @@ class Designer:
     def train(self,iters):
 
          for _ in range(iters):
-             self.play_game(self._render,self.agent1,self.agent1)
+             self.play_game(False,self.agent1,self.agent1)
 
 
 class DesignerZero(Designer):
 
-    def __init__(self,env,agent_config,exp_config,_run=False, eval_threshold = 1):
-        super().__init__(env,agent_config,exp_config, _run=_run)
+    def __init__(self,env,agent_config,exp_config):
+        super().__init__(env,agent_config,exp_config)
 
         self._agent_config = agent_config
         self._exp_config = exp_config
@@ -127,9 +260,9 @@ class DesignerZero(Designer):
         self._train_iters = exp_config["train_iters"]
         self.current_best = self.load_agent(self._agent1_config)
         self.current_player = copy.deepcopy(self.current_best)
-        self.eval_threshold = eval_threshold
+        self.eval_threshold = exp_config["eval_threshold"]
         self.exp_id = None
-        self.load_logger()
+        self.exp_logger = ExpLogger(exp_config,agent_config)
         #self.exp_id = self.load_exp_id()
 
         ###########
@@ -138,96 +271,6 @@ class DesignerZero(Designer):
         self.avg_loss = []
         self.avg_value_loss = []
         self.avg_policy_loss = []
-
-    def init_neptune(self):
-        neptune_api_token = self._exp_config["neptune_api_token"]
-        neptune_name = self._exp_config["neptune_name"]
-        exp_name = self._exp_config["exp_name"]
-
-        data = {
-            "agent_config": self._agent_config,
-            "exp_config": self._exp_config
-        }
-
-        neptune.init(neptune_name,api_token=neptune_api_token)
-
-        neptune.create_experiment(exp_name,params=data)
-
-        self.exp_id = neptune.get_experiment().id
-
-        return neptune.get_experiment()
-
-    def init_tensorboard(self):
-        from torch.utils.tensorboard import SummaryWriter
-        #from tensorboardX import SummaryWriter
-
-        exp_name = self._exp_config["exp_name"]
-        # default `log_dir` is "runs" - we'll be more specific here
-        #writer = SummaryWriter(f'runs/{exp_name}')
-        writer = SummaryWriter()
-
-        data = {
-            "agent_config": self._agent_config,
-            "exp_config": self._exp_config
-        }
-
-        writer.add_hparams(self._exp_config,{})
-        writer.add_hparams(self._agent_config,{})
-
-        self.exp_id = 1
-
-        return writer
-
-    def load_exp_id(self):
-        if self._run:
-            return self._run.id
-        else:
-            try:
-                return neptune.get_experiment().id
-            except:
-                return None
-
-    def load_logger(self):
-
-        logger_type = self._exp_config["logger_type"]
-        if logger_type:
-            if logger_type == "neptune":
-                self.init_neptune()
-                self._run = neptune.get_experiment()
-
-            elif logger_type == "tensorboard":
-                self._run = self.init_tensorboard()
-
-
-        else:
-            return
-
-    def log_metrics(self,iter,iter_metrics):
-
-        logger_type = self._exp_config["logger_type"]
-
-        if logger_type == "neptune":
-            self.log_neptune_metrics(iter,iter_metrics)
-
-        elif logger_type == "tensorboard":
-            self.log_tensorboard_metrics(iter,iter_metrics)
-
-        elif logger_type == "both":
-            self.log_neptune_metrics(iter,iter_metrics)
-            self.log_tensorboard_metrics(iter,iter_metrics)
-
-        return
-
-    def log_neptune_metrics(self,iter,iter_metrics):
-        for key , value in iter_metrics.items():
-            if value:
-                neptune.log_metric(key,value)
-
-    def log_tensorboard_metrics(self,iter,iter_metrics):
-
-        for key , value in iter_metrics.items():
-            if value:
-                self._run.add_scalar(key,value,iter)
 
     def play_game(self,render,agent1,agent2,iter=None,game_num=0):
 
@@ -282,17 +325,16 @@ class DesignerZero(Designer):
 
         vs_minimax = []
         vs_best = []
-        for iter in range(self._iters):
+        for iter in tqdm(range(self._iters)):
 
             print(f"Running iteration {iter}")
 
             iter_metrics = {
-                "train_avg_loss":None,
-                "train_val_loss":None,
-                "train_policy_loss":None,
+                "Total Loss":None,
+                "Value Loss":None,
+                "Policy Loss":None,
                 "tot_p1_wins":None,
                 "tot_p2_wins":None,
-
 
             }
 
@@ -308,8 +350,8 @@ class DesignerZero(Designer):
             avg_total, avg_policy, avg_val = self.current_player.train_network()
 
             iter_metrics["Total Loss"] = avg_total
-            iter_metrics["Policy loss"] = avg_policy
-            iter_metrics["Value loss"] = avg_val
+            iter_metrics["Policy Loss"] = avg_policy
+            iter_metrics["Value Loss"] = avg_val
 
 
             e_time = time.time()
@@ -349,13 +391,14 @@ class DesignerZero(Designer):
                     self.current_player = copy.deepcopy(self.current_best)
 
             # Record metrics each iteration
-            self.log_metrics(iter,iter_metrics)
+            self.exp_logger.log_metrics(iter,iter_metrics)
 
             if self._save_model:
                 if self._run_evaluator:
                     self.current_best.save(self.exp_id)
                 else:
                     self.current_player.save(self.exp_id)
+        return self.exp_logger
 
     def run_eval(self,agent1,agent2,iters,render=False,iter=None):
 

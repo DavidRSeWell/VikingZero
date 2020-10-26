@@ -4,7 +4,7 @@ import gym
 
 class Connect4(gym.Env):
 
-    metadata = {'render.modes': ['human']}
+    metadata = {"render.modes": ["human"]}
 
     def __init__(self,display_board=False):
 
@@ -31,11 +31,11 @@ class Connect4(gym.Env):
         legal_play = np.where(board[:, action] == 0)[0]
 
         if len(legal_play) == 0:
-            print('No legal move')
-            print('BOARD')
+            print("No legal move")
+            print("BOARD")
             print(board)
             print(action)
-            raise Exception(f'Illegal move {action}')
+            raise Exception(f"Illegal move {action}")
 
         else:
             return legal_play[-1]
@@ -45,7 +45,7 @@ class Connect4(gym.Env):
         self.current_player = 1
         self.winner = None
 
-    def render(self, mode='human'):
+    def render(self, mode="human"):
         print(self.board)
 
     def step(self,action):
@@ -130,12 +130,12 @@ class Connect4(gym.Env):
 
     @staticmethod
     def check_winner(board: np.array) -> int:
-        '''
+        """
         Check if board contains a winner or draw
         returns () if game is not complete
         :param board:
         :return:
-        '''
+        """
 
         # TODO I threw up a little when I saw all these if statements I wrote
 
@@ -208,7 +208,6 @@ class Connect4(gym.Env):
         if len(s.shape) == 1:
             s = s.reshape((6,7))
         return np.where(s[0,:] == 0)[0]
-
 
     @staticmethod
     def actions(s: np.array) -> np.array:

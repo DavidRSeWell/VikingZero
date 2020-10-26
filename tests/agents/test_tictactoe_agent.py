@@ -78,16 +78,3 @@ def test_designer():
     designer.play_game(True,designer.agent1,designer.agent2)
 
 
-if __name__ == "__main__":
-
-    '''
-    for seed in range(1000):
-        try:
-            test_random_agent(render=False,seed=seed)
-        except:
-            print(f"Excetiption with seed {seed}")
-    '''
-
-    #test_random_agent(seed=2)
-
-    test_designer()

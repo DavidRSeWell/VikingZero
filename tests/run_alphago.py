@@ -5,11 +5,12 @@ from vikingzero.utils import load_env
 from vikingzero.agents.alphago import DesignerZero
 #from vikingzero.designer import DesignerZero
 
-NEPTUNE_API_TOKEN="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vdWkubmVwdHVuZS5haSIsImFwaV91cmwiOiJodHRwczovL3VpLm5lcHR1bmUuYWkiLCJhcGlfa2V5IjoiYThhM2FkNmItNGJmOC00NTc3LWI1ZDctNmE1NTYxMDBmMzkyIn0="
+NEPTUNE_API_TOKEN=""
 
-neptune.init('befeltingu/sandbox',api_token=NEPTUNE_API_TOKEN)
+neptune_username = ""
 
-#yaml_file = "tictactoe_alphago.yaml"
+neptune.init(f"{neptune_username}/sandbox",api_token=NEPTUNE_API_TOKEN)
+
 yaml_file = "test_alphago.yaml"
 
 # Load experiment variables

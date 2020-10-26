@@ -28,13 +28,3 @@ def dev_connect4_check_winner():
     ])
 
     env.check_winner(board)
-
-
-
-
-if __name__ == '__main__':
-
-    dev_connect_4_render()
-
-    dev_connect4_check_winner()
-

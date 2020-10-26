@@ -35,18 +35,11 @@ class MCTS:
         :return:
         """
         current_player,r = reward
-        #print("----------------Final state -----------------------")
-        #print(path[-1].board.reshape((3, 3)))
-        #print(f"Winner = {winner}")
-        #print(f"reward = {r}")
         for node in reversed(path):
-            #print("----------BOARD --------------")
-            #print(node.board.reshape((3,3)))
             self._N[node] += 1
             if node.player != current_player: # this only works if losing is 0 loss
                 self._Q[node] += r
             else:
-                #print("Reward for board is -r")
                 self._Q[node] -= r
 
     def expand(self,node):
@@ -290,13 +283,9 @@ class MINIMAX:
                 best_score = v
                 best_action = child
 
-        #print(vs)
         return best_action
 
     def run(self,node,type="minimax",d=2,n=5):
-
-        #if node in self.children:
-        #    return self.policy[node]
 
         max_child = None
 

@@ -17,7 +17,7 @@ agent_config:
     max_mem_size: 50000
     momentum: 0.9
     n_sim: 25
-    network_path: "/Users/befeltingu/Documents/GitHub/VikingZero/tests/current_best_Connect4_SAN-359"
+    network_path: ""
     network_type: "cnn"
     num_channels: 64
     output_size: 7

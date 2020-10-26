@@ -1,5 +1,4 @@
 from vikingzero.agents.alphago import DesignerZero, AlphaZero
-from vikingzero.agents.tictactoe_agents import TicTacMCTSNode,TicTacMiniNode
 from vikingzero.environments.tictactoe_env import TicTacToe
 
 
