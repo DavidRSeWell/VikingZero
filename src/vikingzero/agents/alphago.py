@@ -16,8 +16,8 @@ from dataclasses import dataclass
 from operator import itemgetter
 from torch.autograd import Variable
 
-from ..search import MCTS
-from ..designers.connect4_designer import Designer
+from ..search import MCTS, ZeroMCTS
+from ..designer import Designer
 from ..agents.tictactoe_agents import TicTacMCTSNode
 from ..agents.connect4_agent import Connect4MCTSNode
 
@@ -31,6 +31,7 @@ class Memory:
     action_mcts: np.array
     value: np.float
     z: np.float
+
 
 class CnnNNetSmall(nn.Module):
 

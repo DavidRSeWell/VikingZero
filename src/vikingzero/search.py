@@ -157,11 +157,11 @@ class MINIMAX:
         def min_value(child_node):
 
             if child_node.is_terminal():
-               return child_node.reward(player)
+                return child_node.reward(player)
             v = np.inf
             for child in child_node.get_children():
 
-               v = min(v, max_value(child))
+                v = min(v, max_value(child))
 
             return v
 
@@ -373,3 +373,208 @@ class Node(ABC):
     def __eq__(node1, node2):
         "Nodes must be comparable"
         return True
+
+
+class ZeroNode:
+    """
+    Tree Node used for AlphaGo Agents
+    """
+
+    def __init__(self,index, player, parent, parent_action,state,terminal,r):
+        super().__init__(Node)
+
+        self.index = index
+
+        self.parent = parent
+
+        self.parent_action = parent_action
+
+        self.player = player
+
+        self.reward = r
+
+        self.state = state
+
+        self.terminal = terminal
+
+    def __hash__(self):
+        "Nodes must be hashable"
+        return hash((self.state.data.tobytes(), self.player, self.winner,self.parent))
+
+    def __eq__(self, other):
+        "Nodes must be comparable"
+        return np.equal(other.board,self.state).all() and other.player == self.player and other.winner == self.winner \
+                and other.parent == self.parent and other.parent_action == self.parent_action
+
+
+class ZeroMCTS:
+    """
+    Search for AlphaGo Style Algorithms
+    Modified slightly from vanilla MCTS
+    """
+
+    def __init__(self,root: ZeroNode,env,nn,state_encoder,c=1.41,dir_noise=0.3,dir_eps=0.2,):
+
+        self._c = c
+        self._dir_eps = dir_eps # How much of the dirichlet noise to incorporate
+        self._dir_noise = dir_noise # dirichlet noise
+        self._env = env
+        self._nn = nn
+        self._Qsa = defaultdict(tuple)
+        self._Ns = defaultdict(int)
+        self._Nsa = defaultdict(tuple)
+        self._Psa = defaultdict(float)
+        self._Vs = defaultdict(float)
+        self._state_encoder = state_encoder # Function F: Node -> State
+
+        self.root = root
+        self.children = [[]]
+        self.dec_pts = [root]
+        self.parents = [None]
+
+    def add_dec_pt(self,parent,child,prior_p) -> None:
+        """
+        Add a decesion point to the tree
+        initialize the child nodes with prior probability
+        given by the policy network
+        """
+        self.dec_pts.append(child)
+        self.children.append([])
+        parent_index = self.dec_pts.index(parent)
+        self.children[parent_index].append(child)
+
+        if (parent,child.parent_action) not in self._Psa:
+            a = child.parent_action
+            self._Psa[(parent,a)] = prior_p
+            self._Qsa[(parent,a)] = 0
+            self._Nsa[(parent,a)] = 0
+
+    def backup(self,path,r) -> None:
+
+        leaf_player = path[-1].player
+
+        for node in reversed(path):
+            self._Ns[node] += 1
+            self._Nsa[(node.parent,node.parent_action)] += 1
+            if node.parent != leaf_player:
+                self._Qsa[(node.parent,node.parent_action)] -= r
+            else:
+                self._Qsa[(node.parent,node.parent_action)] += r
+
+    def expand(self,leaf: ZeroNode) -> None:
+        """
+        Expand the leaf node using the NN
+        """
+        if (leaf in self.dec_pts) or leaf.terminal:
+            return # The leaf must already be expanded
+
+        children = self.children[self.dec_pts.index(leaf)]
+
+        p , v = self._nn.predict(self._state_encoder(leaf.state))
+
+        if leaf not in self._Vs:
+            self._Vs[leaf] = v
+
+        for child in children:
+            self.add_dec_pt(leaf,child,p[child.parent_action])
+
+    def run(self, node: ZeroNode) -> None:
+        """
+            Run mcts simulations
+            1: Select
+            2: Expand
+            3: Rollout
+            4: Backup
+            :param node:
+            :return:
+        """
+
+        path = self.search(node)
+
+        leaf = path[-1]
+
+        self.expand(leaf)
+
+        reward = self.simulate(leaf)
+
+        self.backup(path, reward)
+
+    def search(self,node: ZeroNode) -> list:
+        """
+        Traverse tree from given node until leaf node is found
+        """
+        path = []
+        while True:
+            path.append(node)
+            if node not in self.dec_pts or not self.children[node.index]:
+                return path
+
+            for child in self.children[node.index]:
+                if child in self.dec_pts:
+                    continue
+
+                else:
+                    path.append(child)
+                    return path
+
+            node = self.select(node)
+
+    def select(self,node: ZeroNode) -> ZeroNode:
+
+        children = self.children[node.index]
+
+        actions = self._env.valid_actions(node)
+
+        if (node,node.parent_action) in self._Psa:
+            p = self._Psa[(node,node.parent_action)]
+        else:
+            p, v = self._nn.predict(self._state_encoder(node.state))
+
+            if node not in self._Vs:
+                self._Vs[node] = v
+
+        # renormalize
+        p[[a for a in range(self._env.action_size) if a not in actions]] = 0
+
+        p = p / p.sum()
+
+        N_p = self._Ns[node]
+
+        if node == self.root:
+
+            dir_noise = np.zeros(self._env.action_size)
+
+            dir_noise[actions] = np.random.dirichlet([self._dir_noise] * len(actions))
+
+            p = (1 - self._dir_eps) * p + self._dir_eps * dir_noise
+
+        child_v = []
+        for child in children:
+
+            a = child.parent_action
+
+            p_a = p[a]
+
+            if (child,a) not in self._Psa:
+                self._Psa[(child,a)] = p_a
+
+            u_c = self._Qsa[(node,a)] / (self._Nsa[(node,a)] + 1) + self._c * p_a * (np.sqrt(N_p) / (1 + self._Nsa[(child,a)]))
+
+            child_v.append((child, u_c))
+
+        return max(child_v, key=itemgetter(1))[0]
+
+    def simulate(self, node) -> float:
+
+        if node in self._Vs[node]:
+            return self._Vs[node]
+
+        else:
+            p,v = self._nn.predict(self._state_encoder(node.state))
+
+            self._Vs[node] = v
+
+            return v
+
+
+
