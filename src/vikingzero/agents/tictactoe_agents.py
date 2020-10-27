@@ -114,7 +114,7 @@ class TicTacToeNode(Node):
         player = 2 if self.player == 1 else 1
         for a in valid_actions:
 
-            next_board = self.env.next_state(curr_board,a, self.player)
+            next_board = self.env.next_state(curr_board,a)
             r, winner = self.env.check_winner(next_board)
             next_node = self.node(env=self.env, board=next_board, player=player, winner=winner)
             children.append(next_node)
@@ -124,7 +124,7 @@ class TicTacToeNode(Node):
         return True if self.env.is_win(self.board) else False
 
     def next_state(self,a):
-        return self.env.next_state(self.board,a,self.player)
+        return self.env.next_state(self.board,a)
 
     @abstractmethod
     def reward(self) -> float:

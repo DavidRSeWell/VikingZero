@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from operator import itemgetter
 from torch.autograd import Variable
 
-from ..search import MCTS, ZeroMCTS
+from ..search import MCTS, ZeroMCTS, ZeroNode
 from ..designer import Designer
 from ..agents.tictactoe_agents import TicTacMCTSNode
 from ..agents.connect4_agent import Connect4MCTSNode
@@ -245,14 +245,13 @@ class ReplayMemory(object):
         return len(self.memory)
 
 
-class AlphaZero(MCTS):
+class AlphaZero:
 
-    def __init__(self,env, augment_input: bool = True, n_sim: int = 50, batch_size: int = 10,max_mem_size: int = 1000,
+    def __init__(self,env,mcts, augment_input: bool = True, n_sim: int = 50, batch_size: int = 10,max_mem_size: int = 1000,
                  epochs: int = 10, c: int = 1, lr: float = 0.001, epsilon: float = 0.2,input_width: int = 3, input_height: int = 3,
                  output_size: int = 9,player: int = 1,momentum: float = 0.9, network_type: str = "normal",optimizer: str = "Adam", t_threshold: int = 10
                  ,test_name: str = "current",num_channels: int = 512, dropout: float = 0.3, weight_decay: float = 0.001,
                  eval_threshold: int = 1, dirichlet_noise: float = 0.3, network_path: str = ""):
-        super().__init__(c)
 
         self.player = player
 
@@ -260,6 +259,7 @@ class AlphaZero(MCTS):
         self._act_max = False
         self._augment_input = augment_input
         self._batch_size = batch_size
+        self._c = c
         self._current_memory = [] # hold memory for current game
         self._current_moves = 0 # Track action count
         self._dir_noise = dirichlet_noise
@@ -291,19 +291,16 @@ class AlphaZero(MCTS):
         self._v_loss = torch.nn.MSELoss(reduction='sum')
         self._weight_decay = weight_decay
 
-        if self._env.name == "TicTacToe":
-            self._Node = TicTacMCTSNode
-        elif self._env.name == "Connect4":
-            self._Node = Connect4MCTSNode
+        self.MCTS = None
 
     def act(self,board):
 
-        s = self._Node(self._env,board,self._env.check_turn(board),0,root=True)
+        s = self.create_node(board)
         # First rum simulations to collect
         # Tree statistics
         for _ in range(self._n_sim):
 
-            self.run(s)
+            self.MCTS.run(s)
 
         a,p_a = self.get_action(s)
 
@@ -319,6 +316,17 @@ class AlphaZero(MCTS):
         #assert len(self._current_memory) <= 10
 
         return a, p_a
+
+    def create_node(self,board):
+        """
+        Create a Node from the given board
+        @param board: np.array
+        @return: Node Object
+        """
+        player = self._env.check_turn(board)
+        winner = self._env.check_winner
+
+        return ZeroNode(state=board, player=player, winner=winner, parent=None, parent_action=None)
 
     def create_model(self,width,height,output_size,nn_type):
 
@@ -516,9 +524,14 @@ class AlphaZero(MCTS):
         Reset the agent before playing a new game
         :return:
         """
+
         self._current_moves = 0
         self.reset_current_memory()
-        self.reset_tree()
+        self._env.reset()
+        root = self.create_node(self._env.board)
+        self.MCTS = ZeroMCTS(root,self._env,self._nn,self.transform_board,
+                             self._c,dir_noise=self._dir_noise,dir_eps=self._epsilon)
+        self.MCTS.reset_tree()
 
     def reset_current_memory(self):
         self._current_memory = []
@@ -526,12 +539,6 @@ class AlphaZero(MCTS):
     def reset_memory(self):
         self._memory.memory = []
         self._memory.position = 0
-
-    def reset_tree(self):
-        self._Q = defaultdict(int)
-        self._N = defaultdict(int)
-
-        self.children = dict()
 
     def reverse_transform(self,board):
         """
@@ -555,65 +562,8 @@ class AlphaZero(MCTS):
 
         return board_original
 
-    def reward(self,leaf_node):
-
-        winner = leaf_node.winner
-        if winner == -1:
-            return 0
-
-        if winner == leaf_node.player:
-            return 1
-        else:
-            return -1
-
     def save(self,id):
         torch.save(self._nn.state_dict(), f"current_best_{self._env.name}_{id}")
-
-    def select_child(self,node):
-
-        children = self.children[node]
-
-        actions = self.get_valid_actions(node)
-
-        p , v = self.predict(node)
-
-        #p = p.detach().numpy().reshape(self._action_size)
-        # renormalize
-        p[[a for a in range(self._action_size) if a not in actions]] = 0
-
-        p = p / p.sum()
-
-        N_p = self._N[node]
-
-        if node.root:
-            dir_noise = np.zeros(self._action_size)
-
-            dir_noise[actions] = np.random.dirichlet([self._dir_noise]*len(actions))
-
-            p = (1 - self._epsilon)*p + self._epsilon*dir_noise
-
-        child_v = []
-        for child in children:
-            a = self.get_parent_action(node, child)
-            p_a = p[a]
-            u_c = self._Q[child] / (self._N[child] + 1) + self.c * p_a * (np.sqrt(N_p) / (1 + self._N[child]))
-            child_v.append((child, u_c))
-
-        # return max(self.children[node], key=uct)
-
-        return max(child_v, key=itemgetter(1))[0]
-
-    def simulate(self,node):
-
-        if node.is_terminal():
-            #reward = node.reward()
-            reward = self.reward(node)
-            return (node.player, reward)
-
-        p,v = self.predict(node)
-        #winner = 1 if node.player == 2 else 2
-
-        return (node.player,float(v))
 
     def show_data_sample(self,sample):
         """

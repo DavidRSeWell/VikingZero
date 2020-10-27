@@ -380,10 +380,7 @@ class ZeroNode:
     Tree Node used for AlphaGo Agents
     """
 
-    def __init__(self,index, player, parent, parent_action,state,terminal,r):
-        super().__init__(Node)
-
-        self.index = index
+    def __init__(self,player, parent, parent_action,state,winner):
 
         self.parent = parent
 
@@ -391,11 +388,25 @@ class ZeroNode:
 
         self.player = player
 
-        self.reward = r
-
         self.state = state
 
-        self.terminal = terminal
+        self.winner = winner
+
+    def terminal(self):
+        if self.winner != 0:
+            return True
+        else:
+            return False
+
+    def reward(self):
+        if self.winner == -1: #Draw
+            return 0.000001
+
+        elif self.winner == self.player:
+            return 1
+
+        else:
+            return -1
 
     def __hash__(self):
         "Nodes must be hashable"
@@ -403,8 +414,7 @@ class ZeroNode:
 
     def __eq__(self, other):
         "Nodes must be comparable"
-        return np.equal(other.board,self.state).all() and other.player == self.player and other.winner == self.winner \
-                and other.parent == self.parent and other.parent_action == self.parent_action
+        return np.equal(other.state,self.state).all() and other.player == self.player and other.winner == self.winner
 
 
 class ZeroMCTS:
@@ -413,17 +423,17 @@ class ZeroMCTS:
     Modified slightly from vanilla MCTS
     """
 
-    def __init__(self,root: ZeroNode,env,nn,state_encoder,c=1.41,dir_noise=0.3,dir_eps=0.2,):
+    def __init__(self,root: ZeroNode,env,nn,state_encoder,c=1.41,dir_noise=0.3,dir_eps=0.2):
 
         self._c = c
         self._dir_eps = dir_eps # How much of the dirichlet noise to incorporate
         self._dir_noise = dir_noise # dirichlet noise
         self._env = env
         self._nn = nn
-        self._Qsa = defaultdict(tuple)
+        self._Qsa = defaultdict(float)
         self._Ns = defaultdict(int)
-        self._Nsa = defaultdict(tuple)
-        self._Psa = defaultdict(float)
+        self._Nsa = defaultdict(int)
+        self._Ps = defaultdict(float)
         self._Vs = defaultdict(float)
         self._state_encoder = state_encoder # Function F: Node -> State
 
@@ -443,20 +453,25 @@ class ZeroMCTS:
         parent_index = self.dec_pts.index(parent)
         self.children[parent_index].append(child)
 
-        if (parent,child.parent_action) not in self._Psa:
-            a = child.parent_action
-            self._Psa[(parent,a)] = prior_p
-            self._Qsa[(parent,a)] = 0
-            self._Nsa[(parent,a)] = 0
+        if parent not in self._Ps:
+            self._Ps[parent] = prior_p
+
+        a = child.parent_action
+        self._Qsa[(parent,a)] = 0
+        self._Nsa[(parent,a)] = 0
 
     def backup(self,path,r) -> None:
 
-        leaf_player = path[-1].player
+        leaf = path[-1]
+        leaf_player = leaf.player
 
         for node in reversed(path):
             self._Ns[node] += 1
+            if not node.parent:
+                continue
+
             self._Nsa[(node.parent,node.parent_action)] += 1
-            if node.parent != leaf_player:
+            if node.player != leaf_player:
                 self._Qsa[(node.parent,node.parent_action)] -= r
             else:
                 self._Qsa[(node.parent,node.parent_action)] += r
@@ -465,10 +480,12 @@ class ZeroMCTS:
         """
         Expand the leaf node using the NN
         """
-        if (leaf in self.dec_pts) or leaf.terminal:
+        leaf_index = self.dec_pts.index(leaf)
+
+        if len(self.children[leaf_index]) > 0 or leaf.terminal():
             return # The leaf must already be expanded
 
-        children = self.children[self.dec_pts.index(leaf)]
+        children = self.get_children(leaf)
 
         p , v = self._nn.predict(self._state_encoder(leaf.state))
 
@@ -476,7 +493,31 @@ class ZeroMCTS:
             self._Vs[leaf] = v
 
         for child in children:
-            self.add_dec_pt(leaf,child,p[child.parent_action])
+            self.add_dec_pt(leaf,child,p)
+
+    def get_children(self,node: ZeroNode) -> list:
+
+        valid_actions = self._env.valid_actions(node.state)
+
+        curr_board = node.state.copy()
+        children = []
+        player = 2 if node.player == 1 else 1
+        for a in valid_actions:
+            next_board = self._env.next_state(curr_board,a)
+            winner = self._env.check_winner(next_board)
+            next_node = ZeroNode(state=next_board, player=player, winner=winner, parent=node, parent_action=a)
+            children.append(next_node)
+        return children
+
+    def reset_tree(self):
+        self._Qsa = defaultdict(tuple)
+        self._Ns = defaultdict(int)
+        self._Nsa = defaultdict(tuple)
+        self._Psa = defaultdict(float)
+        self._Vs = defaultdict(float)
+        self.children = [[]]
+        self.dec_pts = [self.root]
+        self.parents = [None]
 
     def run(self, node: ZeroNode) -> None:
         """
@@ -489,13 +530,21 @@ class ZeroMCTS:
             :return:
         """
 
+        if node in self.dec_pts:
+            node_index = self.dec_pts.index(node)
+            node = self.dec_pts[node_index] # Perfer to use the node that already exists
+
         path = self.search(node)
 
         leaf = path[-1]
 
         self.expand(leaf)
 
+        #child = self.select(leaf)
+
         reward = self.simulate(leaf)
+
+        #path.append(child)
 
         self.backup(path, reward)
 
@@ -506,10 +555,16 @@ class ZeroMCTS:
         path = []
         while True:
             path.append(node)
-            if node not in self.dec_pts or not self.children[node.index]:
+            if node not in self.dec_pts:
+                self._Ns[node] = 0 # just init hear will increment during backup
                 return path
 
-            for child in self.children[node.index]:
+            node_index = self.dec_pts.index(node)
+
+            if len(self.children[node_index]) == 0:
+                return path
+
+            for child in self.children[node_index]:
                 if child in self.dec_pts:
                     continue
 
@@ -520,18 +575,24 @@ class ZeroMCTS:
             node = self.select(node)
 
     def select(self,node: ZeroNode) -> ZeroNode:
+        """
+        @param node:
+        @return:
+        """
+        node_index = self.dec_pts.index(node)
 
-        children = self.children[node.index]
+        children = self.children[node_index]
 
-        actions = self._env.valid_actions(node)
+        actions = self._env.valid_actions(node.state)
 
-        if (node,node.parent_action) in self._Psa:
-            p = self._Psa[(node,node.parent_action)]
+        if node in self._Ps:
+            p = self._Ps[node]
         else:
             p, v = self._nn.predict(self._state_encoder(node.state))
 
-            if node not in self._Vs:
-                self._Vs[node] = v
+            self._Ps[node] = p
+
+            self._Vs[node] = v
 
         # renormalize
         p[[a for a in range(self._env.action_size) if a not in actions]] = 0
@@ -555,9 +616,6 @@ class ZeroMCTS:
 
             p_a = p[a]
 
-            if (child,a) not in self._Psa:
-                self._Psa[(child,a)] = p_a
-
             u_c = self._Qsa[(node,a)] / (self._Nsa[(node,a)] + 1) + self._c * p_a * (np.sqrt(N_p) / (1 + self._Nsa[(child,a)]))
 
             child_v.append((child, u_c))
@@ -566,7 +624,10 @@ class ZeroMCTS:
 
     def simulate(self, node) -> float:
 
-        if node in self._Vs[node]:
+        if node.terminal():
+            return node.reward()
+
+        if node in self._Vs:
             return self._Vs[node]
 
         else:
