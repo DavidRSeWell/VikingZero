@@ -35,6 +35,7 @@ class TicTacToe(gym.Env):
             self.board[4] = 2
             self.board[5] = 1
             self.board[8] = 1
+            self.current_player = 2
 
         #run_test()
 
@@ -99,10 +100,11 @@ class TicTacToe(gym.Env):
             self.board[4] = 2
             self.board[5] = 1
             self.board[8] = 1
-
-        #run_test()
+            self.current_player = 2
 
         self.current_player = 1
+
+        #run_test()
 
     def render(self, mode="human"):
         board_dict = {f"s{i}": int(self.board[i - 1]) for i in range(1, 10)}

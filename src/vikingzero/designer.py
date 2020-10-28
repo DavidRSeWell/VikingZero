@@ -10,7 +10,7 @@ try:
 except:
     pass
 
-from .utils import load_agent, load_env
+from .utils import load_agent
 
 
 class ExpLogger:
@@ -219,7 +219,7 @@ class Designer:
                 self.exp_logger.log_metrics(iter,iter_metrics)
 
             #TODO Allow for self-play as a setting
-            self.train(self._train_iters)
+            self.train(self._train_iters,self.agent1)
 
         return self.exp_logger
 
@@ -242,10 +242,10 @@ class Designer:
 
         return result
 
-    def train(self,iters):
+    def train(self,agent,iters):
 
          for _ in range(iters):
-             self.play_game(False,self.agent1,self.agent1)
+             self.play_game(False,agent,agent)
 
 
 class DesignerZero(Designer):
@@ -276,14 +276,10 @@ class DesignerZero(Designer):
 
         self.env.reset()
 
-        try:
+        if hasattr(agent1,"reset"):
             agent1.reset()
-        except:
-            pass
-        try:
+        if hasattr(agent2,"reset"):
             agent2.reset()
-        except:
-            pass
 
         curr_player = agent1
 
@@ -301,6 +297,12 @@ class DesignerZero(Designer):
                 #self._run.info[f"action_iter={iter}_{b_hash}_{game_num}"] = (curr_board.tolist(),int(action))
 
             curr_state, action, next_state, r = self.env.step(action)
+
+            if hasattr(agent1,"update_state"):
+                agent1.update_state(curr_state,next_state)
+
+            if hasattr(agent2, "update_state"):
+                agent2.update_state(curr_state, next_state)
 
             if render:
                 game_array.append(self.env.board.copy().tolist())

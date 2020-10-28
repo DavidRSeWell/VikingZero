@@ -115,7 +115,7 @@ class TicTacToeNode(Node):
         for a in valid_actions:
 
             next_board = self.env.next_state(curr_board,a)
-            r, winner = self.env.check_winner(next_board)
+            winner = self.env.check_winner(next_board)
             next_node = self.node(env=self.env, board=next_board, player=player, winner=winner)
             children.append(next_node)
         return children
