@@ -29,6 +29,7 @@ class ExpLogger:
         self.load_logger()
 
     def init_neptune(self):
+        print("INIT NEPTUNE")
         neptune_api_token = self._exp_config["neptune_api_token"]
         neptune_name = self._exp_config["neptune_name"]
         exp_name = self._exp_config["exp_name"]
@@ -60,8 +61,10 @@ class ExpLogger:
             "exp_config": self._exp_config
         }
 
-        #writer.add_hparams(self._exp_config,{})
-        #writer.add_hparams(self._agent_config,{})
+        writer.add_hparams(self._exp_config,{})
+        writer.add_hparams(self._agent_config,{})
+
+        #writer.add_hparams(data)
 
         return writer
 
@@ -262,7 +265,6 @@ class DesignerZero(Designer):
         self.current_player = copy.deepcopy(self.current_best)
         self.eval_threshold = exp_config["eval_threshold"]
         self.exp_id = None
-        self.exp_logger = ExpLogger(exp_config,agent_config)
         #self.exp_id = self.load_exp_id()
 
         ###########

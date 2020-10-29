@@ -10,16 +10,16 @@ agent_config:
     c: 1.41
     dirichlet_noise: 1
     epochs: 25
-    epsilon: 0
+    epsilon: 0.2
     dropout: 0.3
     input_width: 3
     input_height: 3
-    lr: 0.001
+    lr: 0.01
     max_mem_size: 10000
     momentum: 0.9
     n_sim: 25
     network_path: ""
-    network_type: "normal"
+    network_type: "cnn_small"
     num_channels: 32
     output_size: 9
     optimizer: Adam
@@ -34,9 +34,9 @@ agent_config:
 
 
 exp_config: # experiment config
-  episodes: 50 # Number of training episodes to run
+  episodes: 100 # Number of training episodes to run
   exp_name: alphago
-  logger_type: tensorboard # what source to use for logging experiments.
+  logger_type: neptune # what source to use for logging experiments.
   neptune_api_token: eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vdWkubmVwdHVuZS5haSIsImFwaV91cmwiOiJodHRwczovL3VpLm5lcHR1bmUuYWkiLCJhcGlfa2V5IjoiYThhM2FkNmItNGJmOC00NTc3LWI1ZDctNmE1NTYxMDBmMzkyIn0=
   neptune_name: befeltingu/sandbox
   plot_data: true
@@ -46,5 +46,5 @@ exp_config: # experiment config
   eval_threshold: 1
   render: true
   run_evaluator: false
-  save_model: true
+  save_model: false
   train_iters: 30 # number of games to play during each episode

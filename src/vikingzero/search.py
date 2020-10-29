@@ -441,6 +441,7 @@ class ZeroMCTS:
         self._Vs = defaultdict(float)
         self._state_encoder = state_encoder # Function F: Node -> State
 
+        self.act_max = False # used to ignore dirichlet noise
         self.root = None
         self.children = []
         self.dec_pts = []
@@ -477,6 +478,7 @@ class ZeroMCTS:
                 continue
 
             self._Nsa[(node.parent,node.parent_action)] += 1
+
             if node.parent.player != leaf_player:
                 #print("Node ....")
                 #print(node)
@@ -495,6 +497,39 @@ class ZeroMCTS:
                 #print("Parent action")
                 #print(node.parent_action)
                 self._Qsa[(node.parent,node.parent_action)] += r
+
+    def display_state_info(self,node):
+        node_index = self.dec_pts.index(node)
+        value = self._Vs[node]
+        counts = self._Ns[node]
+        valid_actions = self._env.valid_actions(node.state)
+        blank_board = np.zeros((9,))
+        q_board = blank_board.copy()
+        v_board = blank_board.copy()
+        n_board = blank_board.copy()
+        child_q = [self._Qsa[(node,a)] for a in valid_actions]
+        children = self.children[node_index]
+        child_actions = [child.parent_action for child in children]
+        child_v = [self._Vs[c] for c in children]
+        child_n = [self._Nsa[(node,a)] for a in valid_actions]
+
+        q_board[valid_actions] = child_q
+        v_board[child_actions] = child_v
+        n_board[valid_actions] = child_n
+
+        prior_p = self._Ps[node].reshape((3,3))
+        print("Vs")
+        print(value)
+        print("Ns")
+        print(counts)
+        print("Nsa")
+        print(n_board.reshape((3,3)))
+        print("Qsa")
+        print(q_board.reshape((3,3)))
+        print("Vsa")
+        print(v_board.reshape((3,3)))
+        print("Prior P")
+        print(prior_p)
 
     def expand(self,leaf: ZeroNode) -> None:
         """
@@ -563,16 +598,16 @@ class ZeroMCTS:
 
         if max:
             max_children = np.array(np.argwhere(p == np.max(p))).flatten()
-            max_index = np.random.choice(max_children)
-            p_all[max_index] = 1
-            return children[max_index].parent_action,p_all
+            max_index = np.random.choice(max_children) # might be more than one with same p value
+            p_action = children[max_index].parent_action
+            p_all[p_action] = 1
+
+            return p_action,p_all
 
         p_all[valid_actions] = p
 
-        try:
-            child = np.random.choice(children, p=p)
-        except:
-            print("BROKEN")
+        child = np.random.choice(children, p=p)
+
         return child.parent_action , p_all
 
     def reset_tree(self):
@@ -681,7 +716,7 @@ class ZeroMCTS:
         #print(p.reshape((3,3)))
         #print(f"Ns = {n_s}")
 
-        if node == self.root:
+        if node == self.root and not self.act_max:
 
             #print("Node is root adding noise")
             dir_noise = np.zeros(self._env.action_size)
