@@ -1,6 +1,7 @@
 import copy
 import time
 import matplotlib.pyplot as plt
+import numbers
 
 from tqdm import tqdm
 
@@ -125,13 +126,15 @@ class ExpLogger:
 
     def log_neptune_metrics(self,iter_metrics):
         for key , value in iter_metrics.items():
-            if value:
+            #if isinstance(value, numbers.Number):
+            if value or value == 0:
                 neptune.log_metric(key,value)
 
     def log_tensorboard_metrics(self,iter,iter_metrics):
 
         for key , value in iter_metrics.items():
-            if value:
+            #if isinstance(value, numbers.Number):
+            if value or value == 0:
                 self._run.add_scalar(key,value,iter)
 
     def plot_metrics(self):

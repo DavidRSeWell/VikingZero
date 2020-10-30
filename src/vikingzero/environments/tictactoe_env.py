@@ -30,7 +30,7 @@ class TicTacToe(gym.Env):
 
             #self.board[0] = 1
             #self.board[1] = 2
-            self.board[2] = 2
+            self.board[0] = 2
             #self.board[3] = 1
             self.board[4] = 2
             self.board[5] = 1
@@ -95,7 +95,7 @@ class TicTacToe(gym.Env):
             #self.board = np.array(board).flatten()
             #self.board[0] = 1
             # self.board[1] = 2
-            self.board[2] = 2
+            self.board[0] = 2
             # self.board[3] = 1
             self.board[4] = 2
             self.board[5] = 1

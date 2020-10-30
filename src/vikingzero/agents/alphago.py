@@ -308,6 +308,8 @@ class AlphaZero:
 
         state = self.processs_state(state)
 
+        assert p_a.sum() > 0.9999
+
         memory = Memory(state,None,p_a,None,None)
 
         self._current_memory.append(memory)
