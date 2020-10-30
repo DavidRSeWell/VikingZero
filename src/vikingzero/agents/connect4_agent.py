@@ -6,7 +6,7 @@ from collections import namedtuple
 
 from ..environments.connect4_env import Connect4
 from ..search import MCTS,MINIMAX,Node
-from ..DNN.nn import UCINet
+from ..connect4_uci_test import Net as UCINet
 
 _CN4 = namedtuple("Connect4Node", "env board player winner")
 

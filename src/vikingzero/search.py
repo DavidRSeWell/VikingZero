@@ -157,11 +157,11 @@ class MINIMAX:
         def min_value(child_node):
 
             if child_node.is_terminal():
-               return child_node.reward(player)
+                return child_node.reward(player)
             v = np.inf
             for child in child_node.get_children():
 
-               v = min(v, max_value(child))
+                v = min(v, max_value(child))
 
             return v
 
@@ -373,3 +373,455 @@ class Node(ABC):
     def __eq__(node1, node2):
         "Nodes must be comparable"
         return True
+
+
+class ZeroNode:
+    """
+    Tree Node used for AlphaGo Agents
+    """
+
+    def __init__(self,player, parent, parent_action,state,winner):
+
+        self.parent = parent
+
+        self.parent_action = parent_action
+
+        self.player = player
+
+        self.state = state
+
+        self.winner = winner
+
+    def terminal(self):
+        if self.winner != 0:
+            return True
+        else:
+            return False
+
+    def reward(self):
+        if self.winner == -1: #Draw
+            return 0.0001
+
+        elif self.winner == self.player:
+            return 1
+
+        else:
+            return -1
+
+    def __str__(self):
+        return str(self.state.reshape((3,3)))
+
+    def __hash__(self):
+        "Nodes must be hashable"
+        return hash((self.state.data.tobytes(), self.player, self.winner,self.parent_action))
+
+    def __eq__(self, other):
+        "Nodes must be comparable"
+        return np.equal(other.state,self.state).all() and other.player == self.player and other.winner == self.winner \
+                                        and other.parent_action == self.parent_action
+
+
+class ZeroMCTS:
+    """
+    Search for AlphaGo Style Algorithms
+    Modified slightly from vanilla MCTS
+    """
+
+    def __init__(self,env,nn,state_encoder,c=1.41,dir_noise=0.3,dir_eps=0.2):
+
+        self._c = c
+        self._dir_eps = dir_eps # How much of the dirichlet noise to incorporate
+        self._dir_noise = dir_noise # dirichlet noise
+        self._env = env
+        self._nn = nn
+        self._Qsa = defaultdict(float)
+        self._Ns = defaultdict(int)
+        self._Nsa = defaultdict(int)
+        self._Ps = defaultdict(float)
+        self._Vs = defaultdict(float)
+        self._state_encoder = state_encoder # Function F: Node -> State
+
+        self.act_max = False # used to ignore dirichlet noise
+        self.root = None
+        self.children = []
+        self.dec_pts = []
+        self.parents = []
+
+    def add_dec_pt(self,parent,child,prior_p) -> None:
+        """
+        Add a decesion point to the tree
+        initialize the child nodes with prior probability
+        given by the policy network
+        """
+        self.dec_pts.append(child)
+        self.children.append([])
+        parent_index = self.dec_pts.index(parent)
+        self.children[parent_index].append(child)
+
+        if parent not in self._Ps:
+            self._Ps[parent] = prior_p
+
+        a = child.parent_action
+        self._Qsa[(parent,a)] = 0
+        self._Nsa[(parent,a)] = 0
+
+    def backup(self,path,r) -> None:
+
+        leaf , leaf_a = path[-1]
+
+        assert (leaf_a is None)
+
+        leaf_player = leaf.player
+
+        #print("Running backup ")
+
+        for node, a in reversed(path):
+            self._Ns[node] += 1
+            if node == leaf:
+                continue
+
+            self._Nsa[(node,a)] += 1
+
+            if leaf.winner == -1: # tie
+                self._Qsa[(node, a)] += r
+                continue
+
+            if node.player != leaf_player:
+                #print("Node ....")
+                #print(node)
+                #print(f"Receiving reward -{r}")
+                #print("Parent")
+                #print(node.parent)
+                #print("Parent action")
+                #print(node.parent_action)
+                self._Qsa[(node,a)] -= r
+            else:
+                #print("Node ....")
+                #print(node)
+                #print(f"Receiving reward +{r}")
+                #print("Parent")
+                #print(node.parent)
+                #print("Parent action")
+                #print(node.parent_action)
+                self._Qsa[(node,a)] += r
+
+    def display_state_info(self,node):
+        node_index = self.dec_pts.index(node)
+        value = self._Vs[node]
+        counts = self._Ns[node]
+        valid_actions = self._env.valid_actions(node.state)
+        blank_board = np.zeros((9,))
+        q_board = blank_board.copy()
+        v_board = blank_board.copy()
+        n_board = blank_board.copy()
+        child_q = [self._Qsa[(node,a)] for a in valid_actions]
+        children = self.children[node_index]
+        child_actions = [child.parent_action for child in children]
+        child_v = [self._Vs[c] for c in children]
+        child_n = [self._Nsa[(node,a)] for a in valid_actions]
+
+        q_board[valid_actions] = child_q
+        v_board[child_actions] = child_v
+        n_board[valid_actions] = child_n
+
+        prior_p = self._Ps[node].copy().reshape((3,3))
+        print("Vs")
+        print(value)
+        print("Ns")
+        print(counts)
+        print("Nsa")
+        print(n_board.reshape((3,3)))
+        print("Qsa")
+        print(q_board.reshape((3,3)))
+        print("Vsa")
+        print(v_board.reshape((3,3)))
+        print("Prior P")
+        print(prior_p)
+
+    def expand(self,leaf: ZeroNode) -> None:
+        """
+        Expand the leaf node using the NN
+        """
+        #print("Running Expand")
+        leaf_index = self.dec_pts.index(leaf)
+
+        if len(self.children[leaf_index]) > 0 or leaf.terminal():
+            return # The leaf must already be expanded
+
+        children = self.get_children(leaf)
+
+        p , v = self._nn.predict(self._state_encoder(leaf))
+
+        assert p.sum() > 0.999
+
+        if leaf not in self._Vs:
+            self._Vs[leaf] = v
+
+        for child in children:
+            self.add_dec_pt(leaf,child,p)
+
+    def is_leaf(self, node: ZeroNode) -> bool:
+        """
+        Return whether a given node is a leaf node or not
+        @param node:
+        @return:
+        """
+
+        node_index = self.dec_pts.index(node)
+
+        if node.terminal():
+            return True
+
+        if len(self.children[node_index]) == 0:
+            return True
+
+    def get_children(self,node: ZeroNode) -> list:
+
+        children = self.children[self.dec_pts.index(node)]
+
+        if len(children) > 0:
+            return children
+
+        valid_actions = self._env.valid_actions(node.state)
+
+        curr_board = node.state.copy()
+        children = []
+        player = 2 if node.player == 1 else 1
+        for a in valid_actions:
+            next_board = self._env.next_state(curr_board,a)
+            winner = self._env.check_winner(next_board)
+            next_node = ZeroNode(state=next_board, player=player, winner=winner, parent=node, parent_action=a)
+            children.append(next_node)
+        return children
+
+    def policy(self,node,tau,max=False):
+        """
+        Give the current statistics in the tree
+        return a distribution over actions for the
+        current node.
+        @param node:
+        @param tau: temperature (float but generally 1)
+        @return:
+        """
+
+        valid_actions = self._env.valid_actions(node.state)
+
+        numerator = [self._Nsa[(node,a)]**tau for a in valid_actions]
+
+        denom = sum(numerator)
+
+        p = np.array(numerator) / denom
+
+        p[np.isnan(p)] = 0
+
+        p = p / p.sum()
+
+        children = self.get_children(node)
+
+        p_all = np.zeros((self._env.action_size,))
+
+        if max:
+            max_children = np.array(np.argwhere(p == np.max(p))).flatten()
+            max_index = np.random.choice(max_children) # might be more than one with same p value
+            p_action = children[max_index].parent_action
+            p_all[p_action] = 1
+
+            return p_action,p_all
+
+        p_all[valid_actions] = p
+
+        child = np.random.choice(children, p=p)
+
+        return child.parent_action , p_all
+
+    def reset_tree(self):
+
+        self._Qsa = defaultdict(float)
+        self._Ns = defaultdict(int)
+        self._Nsa = defaultdict(int)
+        self._Ps = defaultdict(float)
+        self._Vs = defaultdict(float)
+        self.children = []
+        self.dec_pts = []
+        self.parents = []
+
+    def run(self, node: ZeroNode) -> None:
+        """
+            Run mcts simulations
+            1: Select
+            2: Expand
+            3: Rollout
+            4: Backup
+            :param node:
+            :return:
+        """
+
+        #print("Call Run!!!")
+        #print("ROOT NODE")
+        #print(node)
+
+        if node in self.dec_pts:
+            node_index = self.dec_pts.index(node)
+            node = self.dec_pts[node_index] # Perfer to use the node that already exists
+
+        path = self.search(node)
+
+        leaf,a = path[-1]
+
+        self.expand(leaf)
+
+        reward = self.simulate(leaf)
+
+        self.backup(path, reward)
+
+    def search_old(self,node: ZeroNode) -> list:
+        """
+        Traverse tree from given node until leaf node is found
+        """
+        #print("Running Search \n")
+        path = []
+        while True:
+            path.append(node)
+            #print("Adding Node to path")
+            #print(node)
+            if node not in self.dec_pts:
+                #print("Node not in pts returning")
+                self._Ns[node] = 0 # just init hear will increment during backup
+                return path
+
+            node_index = self.dec_pts.index(node)
+
+            if len(self.children[node_index]) == 0:
+                #print("No children returning")
+                return path
+
+            for child in self.children[node_index]:
+
+                if child in self.dec_pts:
+                    continue
+
+                else:
+                    #print("Adding child node")
+                    #print(child)
+                    path.append(child)
+                    return path
+
+            node = self.select(node)
+
+    def search(self, node: ZeroNode) -> list:
+        """
+        For each step t in search selection action
+        until t = L (find leaf node). Store (S,A) pairs)
+        @param node:
+        @return:
+        """
+
+        path = []
+
+        while True:
+
+            if self.is_leaf(node):
+                path.append((node,None))
+                break
+
+            next_s,a = self.select(node)
+
+            path.append((node,a))
+
+            node = next_s
+
+        return path
+
+    def select(self,node: ZeroNode) -> tuple:
+        """
+        @param node:
+        @return:
+        """
+        #print("Selecting New Node")
+
+        node_index = self.dec_pts.index(node)
+
+        children = self.children[node_index]
+
+        actions = self._env.valid_actions(node.state)
+
+        if node in self._Ps:
+            p = self._Ps[node].copy()
+        else:
+            p, v = self._nn.predict(self._state_encoder(node))
+
+            self._Ps[node] = p
+
+            self._Vs[node] = v
+
+        # renormalize
+        p[[a for a in range(self._env.action_size) if a not in actions]] = 0
+
+        p = p / p.sum()
+
+        assert p.sum() > 0.9999
+
+        n_s = self._Ns[node]
+
+        #print("Prior Prob")
+        #print(p.reshape((3,3)))
+        #print(f"Ns = {n_s}")
+
+        if node == self.root and not self.act_max:
+
+            #print("Node is root adding noise")
+            dir_noise = np.zeros(self._env.action_size)
+
+            dir_noise[actions] = np.random.dirichlet([self._dir_noise] * len(actions))
+
+            p = (1 - self._dir_eps) * p + self._dir_eps * dir_noise
+            #print("New p")
+            #print(p.reshape((3,3)))
+
+        child_v = []
+        for child in children:
+
+            a = child.parent_action
+
+            p_a = p[a]
+
+            u_c = self._Qsa[(node,a)] / (self._Nsa[(node,a)] + 1) + self._c * p_a * (np.sqrt(n_s) / (1 + self._Nsa[(node,a)]))
+
+            child_v.append((child, u_c))
+
+        max_c = max(child_v, key=itemgetter(1))[0]
+
+        #print("Found Max child")
+        #print(max_c)
+        return max_c, max_c.parent_action
+
+    def simulate(self, node) -> float:
+
+        #print("Running simulate for Node...")
+        #print(node)
+
+        if node.terminal():
+            #print("Node is terminal")
+            r = node.reward()
+            #print(f"Returning reward {r}")
+            return r
+
+        if node in self._Vs:
+            r = self._Vs[node]
+            #print(f"Node is in VS r={r}")
+
+            return r
+        else:
+            p,v = self._nn.predict(self._state_encoder(node))
+
+            self._Vs[node] = v
+
+            #print(f"Node not in Vs new r = {v}")
+
+            return v
+
+    @property
+    def points(self):
+        return len(self.dec_pts)
+
+

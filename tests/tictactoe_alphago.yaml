@@ -7,19 +7,19 @@ agent_config:
     agent: AlphaZero
     augment_input: true
     batch_size: 32
-    c: 1.41
+    c: 0.5
     dirichlet_noise: 1
     epochs: 25
     epsilon: 0
     dropout: 0.3
     input_width: 3
     input_height: 3
-    lr: 0.001
+    lr: 0.01
     max_mem_size: 10000
     momentum: 0.9
     n_sim: 25
     network_path: ""
-    network_type: "normal"
+    network_type: "cnn_small"
     num_channels: 32
     output_size: 9
     optimizer: Adam
@@ -34,17 +34,17 @@ agent_config:
 
 
 exp_config: # experiment config
-  episodes: 10
+  episodes: 200 # Number of training episodes to run
   exp_name: alphago
-  logger_type: tensorboard # what source to use for logging experiments.
+  logger_type: neptune # what source to use for logging experiments.
   neptune_api_token: eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vdWkubmVwdHVuZS5haSIsImFwaV91cmwiOiJodHRwczovL3VpLm5lcHR1bmUuYWkiLCJhcGlfa2V5IjoiYThhM2FkNmItNGJmOC00NTc3LWI1ZDctNmE1NTYxMDBmMzkyIn0=
   neptune_name: befeltingu/sandbox
   plot_data: true
   record_all: true
-  record_every: 1 # how often to record info
-  eval_iters: 1 # number of games to player during evaluation
+  record_every: 5 # how often to record info
+  eval_iters: 5 # number of games to player during evaluation
   eval_threshold: 1
   render: true
   run_evaluator: false
-  save_model: true
-  train_iters: 5
+  save_model: false
+  train_iters: 50 # number of games to play during each episode

@@ -15,6 +15,8 @@ class TicTacToe(gym.Env):
     def __init__(self,display_board=False):
 
         self._display_board = display_board
+
+        self.action_size = 9
         self.current_player = 1
         self.board = np.zeros(9,)
         self.name = "TicTacToe"
@@ -26,13 +28,14 @@ class TicTacToe(gym.Env):
 
             #self.board = np.array(board).flatten()
 
-            self.board[0] = 1
+            #self.board[0] = 1
             #self.board[1] = 2
-            self.board[2] = 2
+            self.board[0] = 2
             #self.board[3] = 1
             self.board[4] = 2
             self.board[5] = 1
             self.board[8] = 1
+            self.current_player = 1
 
         #run_test()
 
@@ -65,6 +68,18 @@ class TicTacToe(gym.Env):
         else:
             return True
 
+    def next_state(self, state, action):
+
+        player = self.check_turn(state)
+        actions = TicTacToe.actions(state)
+        if len(actions) == 0:
+            print("The current state is a terminal state cannot get next state")
+            return state
+
+        next_s = state.copy()
+        next_s[action] = player
+        return next_s
+
     def reset(self):
         """
         Reset the board
@@ -78,17 +93,18 @@ class TicTacToe(gym.Env):
                           [0., 1., 0.]]
 
             #self.board = np.array(board).flatten()
-            self.board[0] = 1
+            #self.board[0] = 1
             # self.board[1] = 2
-            self.board[2] = 2
+            self.board[0] = 2
             # self.board[3] = 1
             self.board[4] = 2
             self.board[5] = 1
             self.board[8] = 1
-
-        #run_test()
+            self.current_player = 1
 
         self.current_player = 1
+
+        #run_test()
 
     def render(self, mode="human"):
         board_dict = {f"s{i}": int(self.board[i - 1]) for i in range(1, 10)}
@@ -114,8 +130,7 @@ class TicTacToe(gym.Env):
 
             self.board = next_state
 
-            reward, winner = self.check_winner(self.board)
-            r = reward[self.current_player - 1]
+            winner = self.check_winner(self.board)
 
             if not winner:
                 self.current_player = 1 if self.current_player == 2 else 2
@@ -142,6 +157,8 @@ class TicTacToe(gym.Env):
 
         # check if this is a winning move
         winner = TicTacToe.is_win(board)
+        return winner
+        """
         if winner:
             if winner == 1:
                 return (1,-1) , winner
@@ -152,6 +169,7 @@ class TicTacToe(gym.Env):
         else:
             # game still going
             return (0,0) , winner
+        """
 
     @staticmethod
     def check_turn(board):
@@ -211,15 +229,5 @@ class TicTacToe(gym.Env):
         else:
             return 0
 
-    @staticmethod
-    def next_state(state,action,player):
 
-        actions = TicTacToe.actions(state)
-        if len(actions) == 0:
-            print("The current state is a terminal state cannot get next state")
-            return state
-
-        next_state = state.copy()
-        next_state[action] = player
-        return next_state
 

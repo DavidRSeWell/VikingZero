@@ -1,6 +1,7 @@
 import copy
 import time
 import matplotlib.pyplot as plt
+import numbers
 
 from tqdm import tqdm
 
@@ -10,7 +11,7 @@ try:
 except:
     pass
 
-from .utils import load_agent, load_env
+from .utils import load_agent
 
 
 class ExpLogger:
@@ -29,6 +30,7 @@ class ExpLogger:
         self.load_logger()
 
     def init_neptune(self):
+        print("INIT NEPTUNE")
         neptune_api_token = self._exp_config["neptune_api_token"]
         neptune_name = self._exp_config["neptune_name"]
         exp_name = self._exp_config["exp_name"]
@@ -60,8 +62,10 @@ class ExpLogger:
             "exp_config": self._exp_config
         }
 
-        #writer.add_hparams(self._exp_config,{})
-        #writer.add_hparams(self._agent_config,{})
+        writer.add_hparams(self._exp_config,{})
+        writer.add_hparams(self._agent_config,{})
+
+        #writer.add_hparams(data)
 
         return writer
 
@@ -122,13 +126,15 @@ class ExpLogger:
 
     def log_neptune_metrics(self,iter_metrics):
         for key , value in iter_metrics.items():
-            if value:
+            #if isinstance(value, numbers.Number):
+            if value or value == 0:
                 neptune.log_metric(key,value)
 
     def log_tensorboard_metrics(self,iter,iter_metrics):
 
         for key , value in iter_metrics.items():
-            if value:
+            #if isinstance(value, numbers.Number):
+            if value or value == 0:
                 self._run.add_scalar(key,value,iter)
 
     def plot_metrics(self):
@@ -219,7 +225,7 @@ class Designer:
                 self.exp_logger.log_metrics(iter,iter_metrics)
 
             #TODO Allow for self-play as a setting
-            self.train(self._train_iters)
+            self.train(self._train_iters,self.agent1)
 
         return self.exp_logger
 
@@ -242,10 +248,10 @@ class Designer:
 
         return result
 
-    def train(self,iters):
+    def train(self,agent,iters):
 
          for _ in range(iters):
-             self.play_game(False,self.agent1,self.agent1)
+             self.play_game(False,agent,agent)
 
 
 class DesignerZero(Designer):
@@ -262,7 +268,6 @@ class DesignerZero(Designer):
         self.current_player = copy.deepcopy(self.current_best)
         self.eval_threshold = exp_config["eval_threshold"]
         self.exp_id = None
-        self.exp_logger = ExpLogger(exp_config,agent_config)
         #self.exp_id = self.load_exp_id()
 
         ###########
@@ -276,14 +281,10 @@ class DesignerZero(Designer):
 
         self.env.reset()
 
-        try:
+        if hasattr(agent1,"reset"):
             agent1.reset()
-        except:
-            pass
-        try:
+        if hasattr(agent2,"reset"):
             agent2.reset()
-        except:
-            pass
 
         curr_player = agent1
 
@@ -301,6 +302,12 @@ class DesignerZero(Designer):
                 #self._run.info[f"action_iter={iter}_{b_hash}_{game_num}"] = (curr_board.tolist(),int(action))
 
             curr_state, action, next_state, r = self.env.step(action)
+
+            if hasattr(agent1,"update_state"):
+                agent1.update_state(curr_state,next_state)
+
+            if hasattr(agent2, "update_state"):
+                agent2.update_state(curr_state, next_state)
 
             if render:
                 game_array.append(self.env.board.copy().tolist())
