@@ -473,8 +473,6 @@ class ZeroMCTS:
 
         leaf_player = leaf.player
 
-        #print("Running backup ")
-
         for node, a in reversed(path):
             self._Ns[node] += 1
             if node == leaf:
@@ -487,25 +485,15 @@ class ZeroMCTS:
                 continue
 
             if node.player != leaf_player:
-                #print("Node ....")
-                #print(node)
-                #print(f"Receiving reward -{r}")
-                #print("Parent")
-                #print(node.parent)
-                #print("Parent action")
-                #print(node.parent_action)
-                self._Qsa[(node,a)] -= r
+               self._Qsa[(node,a)] -= r
             else:
-                #print("Node ....")
-                #print(node)
-                #print(f"Receiving reward +{r}")
-                #print("Parent")
-                #print(node.parent)
-                #print("Parent action")
-                #print(node.parent_action)
-                self._Qsa[(node,a)] += r
+               self._Qsa[(node,a)] += r
 
     def display_state_info(self,node):
+        """
+        More of a debugging method
+        TICTACTOE ONLY
+        """
         node_index = self.dec_pts.index(node)
         value = self._Vs[node]
         counts = self._Ns[node]
@@ -542,7 +530,6 @@ class ZeroMCTS:
         """
         Expand the leaf node using the NN
         """
-        #print("Running Expand")
         leaf_index = self.dec_pts.index(leaf)
 
         if len(self.children[leaf_index]) > 0 or leaf.terminal():
@@ -656,10 +643,6 @@ class ZeroMCTS:
             :return:
         """
 
-        #print("Call Run!!!")
-        #print("ROOT NODE")
-        #print(node)
-
         if node in self.dec_pts:
             node_index = self.dec_pts.index(node)
             node = self.dec_pts[node_index] # Perfer to use the node that already exists
@@ -678,21 +661,16 @@ class ZeroMCTS:
         """
         Traverse tree from given node until leaf node is found
         """
-        #print("Running Search \n")
         path = []
         while True:
             path.append(node)
-            #print("Adding Node to path")
-            #print(node)
             if node not in self.dec_pts:
-                #print("Node not in pts returning")
                 self._Ns[node] = 0 # just init hear will increment during backup
                 return path
 
             node_index = self.dec_pts.index(node)
 
             if len(self.children[node_index]) == 0:
-                #print("No children returning")
                 return path
 
             for child in self.children[node_index]:
@@ -701,10 +679,8 @@ class ZeroMCTS:
                     continue
 
                 else:
-                    #print("Adding child node")
-                    #print(child)
-                    path.append(child)
-                    return path
+                   path.append(child)
+                   return path
 
             node = self.select(node)
 
@@ -737,7 +713,6 @@ class ZeroMCTS:
         @param node:
         @return:
         """
-        #print("Selecting New Node")
 
         node_index = self.dec_pts.index(node)
 
@@ -763,20 +738,13 @@ class ZeroMCTS:
 
         n_s = self._Ns[node]
 
-        #print("Prior Prob")
-        #print(p.reshape((3,3)))
-        #print(f"Ns = {n_s}")
-
         if node == self.root and not self.act_max:
 
-            #print("Node is root adding noise")
             dir_noise = np.zeros(self._env.action_size)
 
             dir_noise[actions] = np.random.dirichlet([self._dir_noise] * len(actions))
 
             p = (1 - self._dir_eps) * p + self._dir_eps * dir_noise
-            #print("New p")
-            #print(p.reshape((3,3)))
 
         child_v = []
         for child in children:
@@ -791,32 +759,23 @@ class ZeroMCTS:
 
         max_c = max(child_v, key=itemgetter(1))[0]
 
-        #print("Found Max child")
-        #print(max_c)
         return max_c, max_c.parent_action
 
     def simulate(self, node) -> float:
 
-        #print("Running simulate for Node...")
-        #print(node)
-
         if node.terminal():
-            #print("Node is terminal")
             r = node.reward()
-            #print(f"Returning reward {r}")
             return r
 
         if node in self._Vs:
             r = self._Vs[node]
-            #print(f"Node is in VS r={r}")
 
             return r
+
         else:
             p,v = self._nn.predict(self._state_encoder(node))
 
             self._Vs[node] = v
-
-            #print(f"Node not in Vs new r = {v}")
 
             return v
 

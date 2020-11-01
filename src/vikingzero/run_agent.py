@@ -56,7 +56,9 @@ def run_agent(config):
 
     print("Done running experiment")
     if exp_config["plot_data"]:
+        print("Showing results")
         exp_logger.plot_metrics()
 
-    print("Showing results")
+    return exp_logger
+
 

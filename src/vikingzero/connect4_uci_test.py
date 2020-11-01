@@ -1,7 +1,9 @@
 """
 This module was intented to play around with the idea of using
 Connect4 Expert data as a way to test validity of algorithms on
-the connect4 Environment
+the connect4 Environment. In early versions of AlphaGo Expert data was
+used as a way to "seed" the NN. Expert Data can also be a good way
+to do debugging and testing
 """
 
 

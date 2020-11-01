@@ -149,63 +149,6 @@ class CnnNNet(nn.Module):
         return p,v[0]
 
 
-class Network(nn.Module):
-
-    def __init__(self,input_size,output_size):
-        super().__init__()
-
-        self._input_size = input_size
-        self._output_size = output_size
-        # This represents the shared layer(s) before the different heads
-        # Here, I used a single linear layer for simplicity purposes
-        # But any network configuration should work
-        self.h1 = nn.Linear(input_size, input_size*2)
-        self.h2 = nn.Linear(input_size*2, input_size*3)
-        self.h3 = nn.Linear(input_size*3, input_size*4)
-        self.h4 = nn.Linear(input_size*4, input_size*3)
-        self.h5 = nn.Linear(input_size*3, input_size*2)
-        self.h6 = nn.Linear(input_size*2, input_size)
-        #self.h4 = nn.Linear(18, 9)
-
-        # Set up the different heads
-        # Each head can take any network configuration
-        self.policy = nn.Linear(input_size , output_size)
-        self.value = nn.Linear(input_size, 1)
-
-    def forward(self, x):
-
-        x[x == 2] = -1
-        # Run the shared layer(s)
-        x = x.view(-1, self._input_size)
-        x = F.relu(self.h1(x))
-        x = F.relu(self.h2(x))
-        x = F.relu(self.h3(x))
-        x = F.relu(self.h4(x))
-        x = F.relu(self.h5(x))
-        x = F.relu(self.h6(x))
-
-        # Run the different heads with the output of the shared layers as input
-        p = F.log_softmax(self.policy(x), dim=1)
-        value_out = torch.tanh(self.value(x))
-
-        return p, value_out
-
-    def predict(self, board):
-        """
-        board: np array with board
-        """
-        # timing
-        # preparing input
-        #board = board.view(1, self.board_y, self.board_x)
-        self.eval()
-        with torch.no_grad():
-            pi, v = self.forward(board)
-
-        p, v = torch.exp(pi).data.cpu().numpy()[0], v.data.cpu().numpy()[0]
-
-        return p, v[0]
-
-
 class ReplayMemory(object):
 
     def __init__(self, capacity):
@@ -224,18 +167,6 @@ class ReplayMemory(object):
         data = random.sample(self.memory, batch_size)
         return [(d.state,d.action_mcts,d.z) for d in data]
 
-    def save(self,path):
-
-        for d in self.memory:
-            print("---------BOARD-------------")
-            state = d.state.reshape((3,3))
-            print(state)
-            print("Result value")
-            print(f"Z = {d.z}")
-            print("Action Probs")
-            print(f"{d.action_mcts}")
-
-
     def __len__(self):
         return len(self.memory)
 
@@ -244,7 +175,7 @@ class AlphaZero:
 
     def __init__(self,env, augment_input: bool = True, n_sim: int = 50, batch_size: int = 10,max_mem_size: int = 1000,
                  epochs: int = 10, c: int = 1, lr: float = 0.001, epsilon: float = 0.2,input_width: int = 3, input_height: int = 3,
-                 output_size: int = 9,player: int = 1,momentum: float = 0.9, network_type: str = "normal",optimizer: str = "Adam", t_threshold: int = 10
+                 output_size: int = 9,player: int = 1,momentum: float = 0.9, network_type: str = "cnn_small",optimizer: str = "Adam", t_threshold: int = 10
                  ,test_name: str = "current",num_channels: int = 512, dropout: float = 0.3, weight_decay: float = 0.001,
                  eval_threshold: int = 1, dirichlet_noise: float = 0.3, network_path: str = ""):
 
@@ -271,7 +202,7 @@ class AlphaZero:
         self._memory = self.create_memory()
         self._network_path = network_path
         self._num_channels = num_channels
-        self._nn = self.create_model(input_width,input_height,output_size,network_type)
+        self._nn = self.create_model(input_width,input_height,network_type)
         self._n_sim = n_sim
         if optimizer == "Adam":
             self._optimizer = torch.optim.Adam(self._nn.parameters(),lr=lr,weight_decay=weight_decay)
@@ -320,12 +251,9 @@ class AlphaZero:
 
         return a, p_a
 
-    def create_model(self,width,height,output_size,nn_type):
+    def create_model(self,width,height,nn_type):
 
-        if nn_type == "normal":
-            input_size = width*height*3
-            return Network(input_size,output_size)
-        elif nn_type == "cnn":
+        if nn_type == "cnn":
             model =  CnnNNet(width,height,self._action_size,self._num_channels,self._dropout)
         elif nn_type == "cnn_small":
             model =  CnnNNetSmall(width, height, self._action_size, self._num_channels, self._dropout)
@@ -342,6 +270,10 @@ class AlphaZero:
         return ReplayMemory(self._max_mem_size)
 
     def eval(self):
+        """
+        Used when evaluating the agent to ensure
+        the action acts greedily
+        """
         self._act_max = True
         self.MCTS.act_max = True
 
@@ -356,14 +288,6 @@ class AlphaZero:
 
         if self._act_max or (self._current_moves > self._t_threshold):
             a, p = tree.policy(s, self._tau, max=True)
-
-            if self._act_max:
-                print("Selection Action for Node....")
-                print(s)
-                self.MCTS.display_state_info(s)
-
-                print(f"chose action {a}")
-                print(p.reshape((3,3)))
 
         else:
             a, p = tree.policy(s, self._tau)
@@ -386,6 +310,7 @@ class AlphaZero:
 
 
         if len(self.MCTS.dec_pts) == 0:
+
             self.MCTS.children.append([])
             self.MCTS.dec_pts.append(root)
             self.MCTS.parents.append(None)
@@ -475,12 +400,8 @@ class AlphaZero:
 
         # first state in transformed state is player 1
         p1_actions = np.where(state[0].flatten() == 1)[0]
-        #if len(p1_actions) > 0:
-        #    p1_actions = p1_actions[0]
         state_original[p1_actions] = 1
         p2_actions = np.where(state[1].flatten() == 1)[0]
-        #if len(p2_actions) > 0:
-        #    p2_actions = p2_actions[0]
 
         state_original[p2_actions] = 2
 
@@ -501,9 +422,9 @@ class AlphaZero:
 
             state = self.reverse_transform(b)
             print("-----------------state---------------------")
-            print(state.reshape((3,3)))
+            print(state)
             print("MCTS PROBS")
-            print(p.reshape((3,3)))
+            print(p)
             print(f"Value = {v}")
 
     def store_memory(self,z):
@@ -528,18 +449,6 @@ class AlphaZero:
             else:
                 raise Exception("Incorrect winner passed")
 
-            """
-            if z == 2:
-                print("player 2 won")
-            print("--------- MEM STATE ----------------")
-            #print(mem.state.reshape((self._input_height, self._input_width)))
-            print(mem.state)
-            print("--------- state STATE ----------------")
-            print(state.reshape((3,3)))
-            print(f"Turn = {p_turn}")
-            print(f"z = {z}")
-            print(f"mem.z = {mem.z}")
-            """
             self._memory.push(mem)
 
         self.reset_current_memory()
@@ -549,14 +458,7 @@ class AlphaZero:
         last_n = 20
         data = self._memory.memory[-last_n:]
 
-        for d in data:
-            b,p,v = d.state,d.action_mcts,d.z
-            state = self.reverse_transform(b)
-            print("-----------------state---------------------")
-            print(state.reshape((3, 3)))
-            print("MCTS PROBS")
-            print(p.reshape((3, 3)))
-            print(f"Value = {v}")
+        self.show_data_sample(data)
 
     def train_network(self):
 
@@ -595,7 +497,6 @@ class AlphaZero:
             loss.backward()
             self._optimizer.step()
 
-
         return avg_total / self._epochs, avg_policy / self._epochs, avg_value / self._epochs
 
     def train(self):
@@ -623,7 +524,6 @@ class AlphaZero:
         return -torch.sum(targets * outputs) / targets.size()[0]
 
     def loss_v(self, targets, outputs):
-
         return torch.sum((targets - outputs) ** 2) / targets.size()[0]
 
 
