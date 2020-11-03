@@ -6,6 +6,7 @@ except:
     pass
 import numpy as np
 import random
+import time
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -171,13 +172,16 @@ class ReplayMemory(object):
         return len(self.memory)
 
 
+
+
 class AlphaZero:
 
     def __init__(self,env, augment_input: bool = True, n_sim: int = 50, batch_size: int = 10,max_mem_size: int = 1000,
                  epochs: int = 10, c: int = 1, lr: float = 0.001, epsilon: float = 0.2,input_width: int = 3, input_height: int = 3,
                  output_size: int = 9,player: int = 1,momentum: float = 0.9, network_type: str = "cnn_small",optimizer: str = "Adam", t_threshold: int = 10
                  ,test_name: str = "current",num_channels: int = 512, dropout: float = 0.3, weight_decay: float = 0.001,
-                 eval_threshold: int = 1, dirichlet_noise: float = 0.3, network_path: str = ""):
+                 eval_threshold: int = 1, dirichlet_noise: float = 0.3, network_path: str = "", mcts_policy_opt: bool = False, minimax_lookup_path="",
+                 state_lookup_path=""):
 
         self.current_state = None # Used for tracking state. Used for tree lookup
         self.prev_state = None
@@ -199,7 +203,9 @@ class AlphaZero:
         self._input_height = input_height
         self._input_width = input_width
         self._max_mem_size = max_mem_size
+        self._mcts_policy_opt = mcts_policy_opt
         self._memory = self.create_memory()
+        self._minimax_actions = self.load_lookup(minimax_lookup_path)
         self._network_path = network_path
         self._num_channels = num_channels
         self._nn = self.create_model(input_width,input_height,network_type)
@@ -213,6 +219,7 @@ class AlphaZero:
             self._optimizer = torch.optim.SGD(self._nn.parameters(),lr=lr,momentum=momentum)
 
         self._softmax = torch.nn.Softmax(dim=1)
+        self._state_lookup = self.load_lookup(state_lookup_path)
         self._tau = 1
         self._test_name = test_name
         self._t_threshold = t_threshold
@@ -235,7 +242,19 @@ class AlphaZero:
 
             self.MCTS.run(s)
 
-        a,p_a = self.get_action(s)
+        if self._mcts_policy_opt:
+            s_time = time.time()
+            a ,p_a = self.compute_pi_bar(s)
+            e_time = time.time()
+            rt = (e_time - s_time) / 60.0
+            #print(f"MCTS POLICY OPT RT = {rt}")
+
+        else:
+            s_time = time.time()
+            a, p_a = self.get_action(s)
+            e_time = time.time()
+            rt = (e_time - s_time) / 60.0
+            #print(f"Rt norm = {rt}")
 
         state = self.processs_state(state)
 
@@ -250,6 +269,121 @@ class AlphaZero:
         self.prev_state = self.current_state.copy()
 
         return a, p_a
+
+    def compute_pi_bar(self, s) -> tuple:
+        """
+        Compute pi bar as described in the paper
+        MCTS as regularized policy optimization
+        https://arxiv.org/abs/2007.12509
+        """
+
+        def compute_lambda_multiplier(mcts, node, env) -> float:
+
+            valid_actions = env.valid_actions(node.state)
+
+            n = 0
+            for a in valid_actions:
+                n += mcts._Nsa[(node, a)]
+
+            return np.sqrt(n) / (n + len(valid_actions))
+
+        def compute_pi_alpha(p_nn, L, q, alpha):
+
+            q = np.array(q)
+            if q.sum() == 0:
+                print("No q values!")
+            p_nn = np.array(p_nn)
+            return L * p_nn / (alpha - q)
+
+        def find_max_min_alpha(p_a, L, q):
+
+            a = q + L * p_a
+
+            min_alpha = np.max(a)
+
+            b = q + L
+
+            max_alpha = np.max(b)
+
+            return min_alpha, max_alpha
+
+        def get_qa(mcts, node, p_nn):
+
+            valid_actions = self._env.valid_actions(node.state)
+
+            q = np.zeros((self._env.action_size,))
+
+            qa = [mcts._Qsa[(node, a)] for a in valid_actions]
+
+            q[valid_actions] = qa
+
+            p_nn[[a for a in range(self._env.action_size) if a not in valid_actions]] = 0
+
+            p_nn /= p_nn.sum()
+
+            return q, p_nn
+
+        def find_max_alpha(node, env, mcts, p_nn) -> tuple:
+
+            l_n = compute_lambda_multiplier(mcts, node, env)
+
+            q, p_nn = get_qa(mcts, node, p_nn)
+
+            min_a, max_a = find_max_min_alpha(p_nn, l_n, q)
+
+            alpha_star = min_a
+
+            delta = 10000
+            pi_bar = None
+            half = None
+
+            epsilon = 0.0001
+
+            while True:
+
+                half = (min_a + max_a) / 2.0
+
+                pi_bar = compute_pi_alpha(p_nn, l_n, q, half)
+
+                if pi_bar.sum() > (1 + epsilon):
+
+                    min_a = half
+
+                elif pi_bar.sum() < (1 - epsilon):
+
+                    max_a = half
+
+                else:
+                    #print("Found max alpha! ")
+                    #print(half)
+                    break
+
+            return half, pi_bar
+
+        p_nn, v = self.predict(s)
+
+        valid_actions = self._env.valid_actions(s.state)
+
+        mask = [a for a in range(p_nn.shape[0]) if a not in valid_actions]
+
+        p_nn[mask] = 0
+
+        p_nn = p_nn / p_nn.sum()
+
+        max_alpha, pi_bar = find_max_alpha(s, self._env, self.MCTS, p_nn)
+
+        pi_bar[mask] = 0
+
+        pi_bar = pi_bar / pi_bar.sum()
+
+        if self._act_max:
+            max_child = np.argmax(pi_bar)
+            pi_bar = np.zeros((self._env.action_size,))
+            pi_bar[max_child] = 1
+
+        random_child = np.random.choice(pi_bar,p=pi_bar)
+
+        return np.where(pi_bar == random_child)[0][0], pi_bar
 
     def create_model(self,width,height,nn_type):
 
@@ -268,6 +402,18 @@ class AlphaZero:
 
     def create_memory(self):
         return ReplayMemory(self._max_mem_size)
+
+    def display_state_info(self,state,action):
+        """
+        Display value of current state
+        """
+
+        player = self._env.check_turn(state)
+        winner = self._env.check_winner(state)
+
+        node = ZeroNode(state=state, player=player, winner=winner, parent=None, parent_action=action)
+
+        self.MCTS.display_state_info(node)
 
     def eval(self):
         """
@@ -294,6 +440,16 @@ class AlphaZero:
 
         return a , p
 
+    def get_policy_action(self,state):
+        """
+        Select best action just from policy network
+        """
+        state = self.processs_state(state)
+        state = Variable(torch.from_numpy(state).type(dtype=torch.float))
+        p , v = self._nn.predict(state)
+
+        return np.argmax(p)
+
     def get_node(self,state):
         """
         Create a Node from the given state
@@ -308,8 +464,7 @@ class AlphaZero:
 
         root = ZeroNode(state=state, player=player, winner=winner, parent=None, parent_action=parent_action)
 
-
-        if len(self.MCTS.dec_pts) == 0:
+        if root not in self.MCTS.dec_pts:
 
             self.MCTS.children.append([])
             self.MCTS.dec_pts.append(root)
@@ -359,8 +514,6 @@ class AlphaZero:
         return self._nn.predict(state)
 
     def processs_state(self,state):
-
-        state = state.reshape((self._input_height, self._input_width))
 
         if self._augment_input:
             state = self.transform_state(state)
@@ -520,10 +673,31 @@ class AlphaZero:
         self.prev_state = prev_state
         self.current_state = curr_state
 
+    def loss_minimax(self):
+        """
+            Compute loss of agent actions vs minimax agents actions
+        """
+
+        num_state = len(self._minimax_actions)
+        correct = 0
+        for k,v in self._minimax_actions.items():
+            state = self._state_lookup[k]
+            a = self.get_policy_action(state)
+            if a in self._minimax_actions[k]:
+                correct += 1
+
+        return float(correct / num_state)
+
     def loss_pi(self, targets, outputs):
         return -torch.sum(targets * outputs) / targets.size()[0]
 
     def loss_v(self, targets, outputs):
         return torch.sum((targets - outputs) ** 2) / targets.size()[0]
 
+    @staticmethod
+    def load_lookup(path) -> dict:
 
+        if len(path) > 0:
+            return np.load(path, allow_pickle=True).item()
+        else:
+            return {}

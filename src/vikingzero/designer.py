@@ -130,7 +130,8 @@ class ExpLogger:
 
     def plot_metrics(self):
         for k,v in self._exp_metrics.items():
-            plt.plot(self._exp_metrics[k])
+            v = [x for x in v if x is not None]
+            plt.plot(v)
             plt.title(k)
             plt.legend()
             plt.show()
@@ -251,6 +252,7 @@ class DesignerZero(Designer):
         self._agent_config = agent_config
         self._exp_config = exp_config
         self._run_evaluator = exp_config["run_evaluator"]
+        self._run_minimax_eval = exp_config["run_minimax_eval"]
         self._save_model = exp_config["save_model"]
         self._train_iters = exp_config["train_iters"]
         self.current_best = self.load_agent(self._agent1_config)
@@ -278,6 +280,8 @@ class DesignerZero(Designer):
 
         game_array = []
 
+        last_action = None
+
         while True:
 
             action = curr_player.act(self.env.board)
@@ -293,14 +297,13 @@ class DesignerZero(Designer):
 
             if hasattr(agent1,"update_state"):
                 agent1.update_state(curr_state,next_state)
-                if render:
-                    agent1.MCTS.display_state_info(agent1.current_state)
 
-            if hasattr(agent2, "update_state"):
-                agent2.update_state(curr_state, next_state)
-                if render:
-                    agent2.MCTS.display_state_info(agent1.current_state)
+            if hasattr(agent2,"update_state"):
+                agent2.update_state(curr_state,next_state)
 
+            if render and hasattr(curr_player, "display_state_info"):
+                curr_player.display_state_info(curr_state,last_action)
+                print(f"Agent chose action ={action}")
 
             if render:
                 game_array.append(self.env.board.copy().tolist())
@@ -310,6 +313,8 @@ class DesignerZero(Designer):
                 break
 
             curr_player = agent2 if curr_player == agent1 else agent1
+
+            last_action = action
 
         return self.env.winner
 
@@ -373,6 +378,9 @@ class DesignerZero(Designer):
 
                 iter_metrics["tot_p1_wins"] = p1_result
                 iter_metrics["tot_p2_wins"] = p2_result
+
+                if self._run_minimax_eval:
+                    iter_metrics["minimax_score"] = self.current_player.loss_minimax()
 
             if self._run_evaluator:
                 print("---------- Current Player vs Current Best ____________ ")

@@ -38,7 +38,7 @@ def run_agent(config):
 
     exp_config = data["exp_config"]
 
-    designer = None
+    designer = Designer
 
     agent1 = agent_config["agent1"]["agent"]
     agent2 = agent_config["agent2"]["agent"]
@@ -46,8 +46,6 @@ def run_agent(config):
     if "AlphaZero" in (agent1, agent2):
         print("Running AlphaGO Zero Experiment. Loading Appropriate designer")
         designer = DesignerZero
-    else:
-        designer = Designer
 
     designer = designer(env,agent_config,exp_config)
 

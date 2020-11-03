@@ -9,6 +9,7 @@ from collections import defaultdict
 from operator import itemgetter
 
 import numpy as np
+import time
 
 
 class MCTS:
@@ -234,6 +235,8 @@ class MINIMAX:
 
         return np.random.choice(all_maxes)
 
+        #return all_maxes
+
     def alpha_beta_depth(self,node,cutoff_test=None,n=5):
 
         player = node.player
@@ -296,6 +299,13 @@ class MINIMAX:
         elif type == "alphabeta":
 
             max_child = self.alpha_beta(node)
+            """
+            actions = []
+            for child in max_child:
+                actions.append(self.get_parent_action(node,child))
+
+            return actions
+            """
 
         elif type == "alphabeta_depth":
 
@@ -494,7 +504,16 @@ class ZeroMCTS:
         More of a debugging method
         TICTACTOE ONLY
         """
-        node_index = self.dec_pts.index(node)
+        if node not in self._Vs or node not in self._Ps:
+            p, v = self._nn.predict(self._state_encoder(node))
+
+            self._Ps[node] = p
+            self._Vs[node] = v
+
+        try:
+            node_index = self.dec_pts.index(node)
+        except:
+            print("oppsssy")
         value = self._Vs[node]
         counts = self._Ns[node]
         valid_actions = self._env.valid_actions(node.state)
@@ -554,7 +573,11 @@ class ZeroMCTS:
         @return:
         """
 
-        node_index = self.dec_pts.index(node)
+        try:
+            node_index = self.dec_pts.index(node)
+        except:
+            sim_nodes = self.get_nodes_from_state(node.state)
+            print("ahhh")
 
         if node.terminal():
             return True
@@ -580,6 +603,17 @@ class ZeroMCTS:
             next_node = ZeroNode(state=next_board, player=player, winner=winner, parent=node, parent_action=a)
             children.append(next_node)
         return children
+
+    def get_nodes_from_state(self,state):
+        """
+        Return all nodes of tree that have the
+        given state
+        """
+        nodes = []
+        for node in self.dec_pts:
+            if np.equal(node.state,state).all():
+                nodes.append(node)
+        return nodes
 
     def policy(self,node,tau,max=False):
         """
@@ -646,6 +680,22 @@ class ZeroMCTS:
         if node in self.dec_pts:
             node_index = self.dec_pts.index(node)
             node = self.dec_pts[node_index] # Perfer to use the node that already exists
+
+        if node not in self.dec_pts:
+            print("WHYU ")
+            #self.add_dec_pt(no)
+            if node != self.root:
+                parent_index = self.dec_pts.index(node.parent)
+                self.children[parent_index].append(node)
+                a = node.parent_action
+                self._Qsa[(node.parent, a)] = 0
+                self._Nsa[(node.parent, a)] = 0
+
+            self.dec_pts.append(node)
+            self.children.append([])
+
+            print("Wtf")
+
 
         path = self.search(node)
 
@@ -724,6 +774,8 @@ class ZeroMCTS:
             p = self._Ps[node].copy()
         else:
             p, v = self._nn.predict(self._state_encoder(node))
+
+            assert type(p) == np.ndarray
 
             self._Ps[node] = p
 
