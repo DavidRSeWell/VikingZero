@@ -172,8 +172,6 @@ class ReplayMemory(object):
         return len(self.memory)
 
 
-
-
 class AlphaZero:
 
     def __init__(self,env, augment_input: bool = True, n_sim: int = 50, batch_size: int = 10,max_mem_size: int = 1000,
@@ -231,16 +229,7 @@ class AlphaZero:
 
     def act(self,state):
 
-        self.current_state = state.copy()
-
-        s = self.get_node(self.current_state)
-
-        self.MCTS.root = s
-        # First run simulations to collect
-        # Tree statistics
-        for _ in range(self._n_sim):
-
-            self.MCTS.run(s)
+        s = self.run_search(state)
 
         if self._mcts_policy_opt:
             s_time = time.time()
@@ -256,7 +245,7 @@ class AlphaZero:
             rt = (e_time - s_time) / 60.0
             #print(f"Rt norm = {rt}")
 
-        state = self.processs_state(state)
+        state = self.process_state(state)
 
         assert p_a.sum() > 0.9999
 
@@ -285,7 +274,7 @@ class AlphaZero:
             for a in valid_actions:
                 n += mcts._Nsa[(node, a)]
 
-            return np.sqrt(n) / (n + len(valid_actions))
+            return self._c*np.sqrt(n) / (n + len(valid_actions))
 
         def compute_pi_alpha(p_nn, L, q, alpha):
 
@@ -293,17 +282,26 @@ class AlphaZero:
             if q.sum() == 0:
                 print("No q values!")
             p_nn = np.array(p_nn)
-            return L * p_nn / (alpha - q)
+            denom = alpha - q
+            denom[denom == 0] = -0.001
+            assert 0 not in denom
+            return L * p_nn / denom
 
         def find_max_min_alpha(p_a, L, q):
 
             a = q + L * p_a
+
+            a = a[a != 0]
 
             min_alpha = np.max(a)
 
             b = q + L
 
             max_alpha = np.max(b)
+
+            if min_alpha == 0:
+                #min_alpha += 0.0000001
+                pass
 
             return min_alpha, max_alpha
 
@@ -316,6 +314,8 @@ class AlphaZero:
             qa = [mcts._Qsa[(node, a)] for a in valid_actions]
 
             q[valid_actions] = qa
+
+            q = (q - np.min(q)) / (np.max(q) - np.min(q))
 
             p_nn[[a for a in range(self._env.action_size) if a not in valid_actions]] = 0
 
@@ -331,17 +331,21 @@ class AlphaZero:
 
             min_a, max_a = find_max_min_alpha(p_nn, l_n, q)
 
+
             alpha_star = min_a
 
             delta = 10000
             pi_bar = None
             half = None
 
-            epsilon = 0.0001
+            epsilon = 0.01
 
             while True:
 
-                half = (min_a + max_a) / 2.0
+                if min_a == max_a:
+                    return half,pi_bar
+                half_distance = (min_a - max_a) / 2.0
+                half = min_a - half_distance
 
                 pi_bar = compute_pi_alpha(p_nn, l_n, q, half)
 
@@ -440,11 +444,31 @@ class AlphaZero:
 
         return a , p
 
+    def get_child_values(self,state):
+
+        og_state = self.reverse_transform(state)
+
+        valid_actions = self._env.valid_actions(og_state)
+
+        child_states = [self._env.next_state(og_state,a) for a in valid_actions]
+
+        child_states = [self.transform_state(c) for c in child_states]
+
+        child_states = [torch.FloatTensor(c) for c in child_states]
+
+        vs = [self._nn.predict(c)[1] for c in child_states]
+
+        p = np.zeros((9,))
+
+        p[valid_actions] = vs
+
+        return p
+
     def get_policy_action(self,state):
         """
         Select best action just from policy network
         """
-        state = self.processs_state(state)
+        state = self.process_state(state)
         state = Variable(torch.from_numpy(state).type(dtype=torch.float))
         p , v = self._nn.predict(state)
 
@@ -504,7 +528,7 @@ class AlphaZero:
     def node_to_state(self,s):
 
         state = s.state
-        state = self.processs_state(state)
+        state = self.process_state(state)
         state = Variable(torch.from_numpy(state).type(dtype=torch.float))
 
         return state
@@ -513,7 +537,7 @@ class AlphaZero:
         state = self.node_to_state(s)
         return self._nn.predict(state)
 
-    def processs_state(self,state):
+    def process_state(self,state):
 
         if self._augment_input:
             state = self.transform_state(state)
@@ -560,6 +584,20 @@ class AlphaZero:
 
         return state_original
 
+    def run_search(self,state):
+
+        self.current_state = state.copy()
+
+        s = self.get_node(self.current_state)
+
+        self.MCTS.root = s
+        # First run simulations to collect
+        # Tree statistics
+        for _ in range(self._n_sim):
+            self.MCTS.run(s)
+
+        return s
+
     def save(self,id):
         torch.save(self._nn.state_dict(), f"current_best_{self._env.name}_{id}")
 
@@ -570,15 +608,23 @@ class AlphaZero:
         :return:
         """
 
-        for data in sample:
-            b , p , v = data
+        self._nn.eval()
 
-            state = self.reverse_transform(b)
+        for data in sample:
+            p, v = self._nn.predict(torch.FloatTensor(data.state))
+            state = self.reverse_transform(data.state)
             print("-----------------state---------------------")
-            print(state)
+            print(state.reshape((3,3)))
             print("MCTS PROBS")
-            print(p)
-            print(f"Value = {v}")
+            print(data.action_mcts)
+            print("NN P")
+            print(p.reshape(3,3))
+            print(f"True Value = {data.z}")
+            print("NN V")
+            print(v)
+            print("Children Values")
+            child_values = self.get_child_values(data.state)
+            print(child_values.reshape((3,3)))
 
     def store_memory(self,z):
         """
@@ -615,10 +661,12 @@ class AlphaZero:
 
     def train_network(self):
 
-        self._nn.train()
-
         if len(self._memory) < self._batch_size:
             return None,None,None
+
+        #self.view_current_memory()
+
+        self._nn.train()
 
         avg_total = 0
         avg_value = 0
@@ -677,16 +725,40 @@ class AlphaZero:
         """
             Compute loss of agent actions vs minimax agents actions
         """
-
+        s_t = time.time()
+        self.eval()
         num_state = len(self._minimax_actions)
-        correct = 0
+        policy_correct = 0.0
+        mcts_correct = 0.0
+        mcts_bar_correct = 0.0
         for k,v in self._minimax_actions.items():
             state = self._state_lookup[k]
-            a = self.get_policy_action(state)
-            if a in self._minimax_actions[k]:
-                correct += 1
+            policy_a = self.get_policy_action(state)
+            #print(state.reshape(3,3))
+            minimax_action = self._minimax_actions[k]
+            #print(minimax_action)
+            if policy_a in minimax_action:
+                policy_correct += 1
+            self.reset()
+            s = self.run_search(state)
+            #bar_a, pi_bar = self.compute_pi_bar(s)
 
-        return float(correct / num_state)
+            mcts_a, mcts_pi = self.get_action(s)
+
+            #if bar_a in self._minimax_actions[k]:
+            #    mcts_bar_correct += 1
+
+            if mcts_a in self._minimax_actions[k]:
+                mcts_correct += 1
+
+        e_t = time.time()
+
+        run_time = (e_t - s_t) / 60.0
+
+        print("Loss minimax runtime")
+        print(run_time)
+        self.train()
+        return policy_correct / num_state , mcts_correct / num_state , mcts_bar_correct / num_state
 
     def loss_pi(self, targets, outputs):
         return -torch.sum(targets * outputs) / targets.size()[0]

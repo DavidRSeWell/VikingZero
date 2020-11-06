@@ -101,6 +101,9 @@ def create_minimax_lookup(save_path,state_dict_path=""):
 
         minimax_actions[k] = list(a)
 
+    print("Done creating minimax lookup")
+    print("Num states .....")
+    print(len(minimax_actions))
     np.save(save_path,minimax_actions)
 
 

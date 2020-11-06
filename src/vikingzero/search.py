@@ -299,6 +299,7 @@ class MINIMAX:
         elif type == "alphabeta":
 
             max_child = self.alpha_beta(node)
+
             """
             actions = []
             for child in max_child:

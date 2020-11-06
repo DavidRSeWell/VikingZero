@@ -2,6 +2,8 @@ import copy
 import time
 import matplotlib.pyplot as plt
 
+from collections.abc import Iterable
+from datetime import datetime
 from tqdm import tqdm
 
 # code in place if someone wants to use neptune to track experiments
@@ -24,7 +26,7 @@ class ExpLogger:
     def __init__(self,exp_config,agent_config):
         self._agent_config = agent_config
         self._exp_config = exp_config
-        self._exp_metrics = {}
+        self._exp_metrics = {"time": datetime.now()}
         self._run = None
         self.load_logger()
 
@@ -95,8 +97,8 @@ class ExpLogger:
 
     def log_metrics(self,iter,iter_metrics):
 
-        if len(self._exp_metrics.keys()) == 0:
-            for k , v in iter_metrics.items():
+        for k , v in iter_metrics.items():
+            if k not in self._exp_metrics:
                 self._exp_metrics[k] = []
 
         logger_type = self._exp_config["logger_type"]
@@ -130,6 +132,8 @@ class ExpLogger:
 
     def plot_metrics(self):
         for k,v in self._exp_metrics.items():
+            if not isinstance(v,Iterable):
+                continue
             v = [x for x in v if x is not None]
             plt.plot(v)
             plt.title(k)
@@ -267,6 +271,29 @@ class DesignerZero(Designer):
         self.avg_value_loss = []
         self.avg_policy_loss = []
 
+    def compute_metrics(self,iter_metrics) -> tuple:
+
+        # Evaluate
+        if self._render:
+            print(" ---------- Eval as player 1 vs minimax ---------")
+        p1_result = self.run_eval(self.current_player, self.agent2,self._eval_iters,iter=iter)
+
+        if self._render:
+            print(" ---------- Eval as player 2 vs minimax ---------")
+        p2_result = self.run_eval(self.agent2, self.current_player, self._eval_iters, iter=iter)
+        p2_result *= -1
+
+        iter_metrics["tot_p1_wins"] = p1_result
+        iter_metrics["tot_p2_wins"] = p2_result
+
+        if self._run_minimax_eval:
+            policy_correct, mcts_correct, mcts_bar_correct = self.current_player.loss_minimax()
+            iter_metrics["policy_minimax_score"] = policy_correct
+            iter_metrics["mcts_minimax_score"] = mcts_correct
+            #iter_metrics["mcts_bar_minimax_score"] = mcts_bar_correct
+
+        return iter_metrics
+
     def play_game(self,render,agent1,agent2,iter=None,game_num=0):
 
         self.env.reset()
@@ -328,8 +355,9 @@ class DesignerZero(Designer):
 
         # Initialize run by training a current best agent
 
-        vs_minimax = []
-        vs_best = []
+        iter_metrics = self.compute_metrics({})
+        self.exp_logger.log_metrics(0, iter_metrics)
+
         for iter in tqdm(range(self._iters)):
 
             print(f"Running iteration {iter}")
@@ -354,9 +382,9 @@ class DesignerZero(Designer):
             s_time = time.time()
             avg_total, avg_policy, avg_val = self.current_player.train_network()
 
-            iter_metrics["Total Loss"] = avg_total
-            iter_metrics["Policy Loss"] = avg_policy
-            iter_metrics["Value Loss"] = avg_val
+            iter_metrics["Total Loss"] = float(avg_total)
+            iter_metrics["Policy Loss"] = float(avg_policy)
+            iter_metrics["Value Loss"] = float(avg_val)
 
 
             e_time = time.time()
@@ -364,23 +392,8 @@ class DesignerZero(Designer):
             print(f"Training network time ={min_time}")
 
             if (iter % self._record_every) == 0:
-                # Evaluate
-                if self._render:
-                    print(" ---------- Eval as player 1 vs minimax ---------")
-                p1_result = self.run_eval(self.current_player, self.agent2,self._eval_iters,iter=iter)
-                vs_minimax.append(p1_result)
 
-                if self._render:
-                    print(" ---------- Eval as player 2 vs minimax ---------")
-                p2_result = self.run_eval(self.agent2, self.current_player, self._eval_iters, iter=iter)
-                p2_result *= -1
-                vs_minimax.append(p2_result)
-
-                iter_metrics["tot_p1_wins"] = p1_result
-                iter_metrics["tot_p2_wins"] = p2_result
-
-                if self._run_minimax_eval:
-                    iter_metrics["minimax_score"] = self.current_player.loss_minimax()
+                iter_metrics = self.compute_metrics(iter_metrics)
 
             if self._run_evaluator:
                 print("---------- Current Player vs Current Best ____________ ")
@@ -391,8 +404,6 @@ class DesignerZero(Designer):
 
                 tot_result = curr_result + -1*curr_result2
 
-                vs_best.append(tot_result)
-
                 if (tot_result >= self.eval_threshold):
                     print(f"Changing Agent on iteration = {iter}")
                     self.current_best = copy.deepcopy(self.current_player)
@@ -401,7 +412,7 @@ class DesignerZero(Designer):
                     self.current_player = copy.deepcopy(self.current_best)
 
             # Record metrics each iteration
-            self.exp_logger.log_metrics(iter,iter_metrics)
+            self.exp_logger.log_metrics(iter + 1,iter_metrics)
 
             if self._save_model:
                 if self._run_evaluator:

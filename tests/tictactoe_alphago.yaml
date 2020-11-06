@@ -8,17 +8,17 @@ agent_config:
     augment_input: true
     batch_size: 16
     c: 1.41
-    dirichlet_noise: 1
-    epochs: 25
+    dirichlet_noise: 0.03
+    epochs: 100
     epsilon: 0
     dropout: 0.3
     input_width: 3
     input_height: 3
-    lr: 0.005
+    lr: 0.01
     max_mem_size: 20000
     mcts_policy_opt: false
     momentum: 0.9
-    n_sim: 25
+    n_sim: 10
     network_path: ""
     network_type: "cnn_small"
     num_channels: 32
@@ -27,7 +27,7 @@ agent_config:
     player: 1
     minimax_lookup_path: /Users/befeltingu/Documents/Github/VikingZeroDev/tests/minimax_state_actions.npy
     state_lookup_path: /Users/befeltingu/Documents/Github/VikingZeroDev/tests/state_dict.npy
-    t_threshold: 2
+    t_threshold: 6
     weight_decay: 0
 
   agent2:
@@ -37,15 +37,15 @@ agent_config:
 
 
 exp_config: # experiment config
-  episodes: 300 # Number of training episodes to run
+  episodes: 50 # Number of training episodes to run
   exp_name: alphago
-  logger_type: neptune # what source to use for logging experiments.
+  logger_type: false # what source to use for logging experiments.
   neptune_api_token: eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vdWkubmVwdHVuZS5haSIsImFwaV91cmwiOiJodHRwczovL3VpLm5lcHR1bmUuYWkiLCJhcGlfa2V5IjoiYThhM2FkNmItNGJmOC00NTc3LWI1ZDctNmE1NTYxMDBmMzkyIn0=
   neptune_name: befeltingu/sandbox
   plot_data: true
   record_all: true
-  record_every: 5 # how often to record info
-  run_minimax_eval: true
+  record_every: 2 # how often to record info
+  run_minimax_eval: false
   eval_iters: 1 # number of games to player during evaluation
   eval_threshold: 1
   render: true

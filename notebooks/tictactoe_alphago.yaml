@@ -6,7 +6,7 @@ agent_config:
   agent1:
     agent: AlphaZero
     augment_input: true
-    batch_size: 32
+    batch_size: 8
     c: 1.41
     dirichlet_noise: 1
     epochs: 25
@@ -24,6 +24,8 @@ agent_config:
     output_size: 9
     optimizer: Adam
     player: 1
+    minimax_lookup_path: /Users/befeltingu/Documents/Github/VikingZeroDev/tests/minimax_state_actions.npy
+    state_lookup_path: /Users/befeltingu/Documents/Github/VikingZeroDev/tests/state_dict.npy
     t_threshold: 2
     weight_decay: 0
 
@@ -34,7 +36,7 @@ agent_config:
 
 
 exp_config: # experiment config
-  episodes: 10 # total number of episodes to run
+  episodes: 5 # total number of episodes to run
   exp_name: alphago
   logger_type: tensorboard # what source to use for logging experiments.
   neptune_api_token: neptune_api_key
@@ -46,5 +48,6 @@ exp_config: # experiment config
   eval_threshold: 1
   render: false
   run_evaluator: false
+  run_minimax_eval: true
   save_model: true
-  train_iters: 1 # number of games to play per episode
+  train_iters: 5 # number of games to play per episode
