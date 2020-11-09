@@ -84,7 +84,7 @@ zero_mcts.root = root
 
 if __name__ == "__main__":
 
-    for _ in range(30):
+    for _ in range(40):
         zero_mcts.run(root)
 
     _repr_png_(zero_mcts)

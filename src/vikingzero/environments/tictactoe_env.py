@@ -34,10 +34,10 @@ class TicTacToe(gym.Env):
             self.board[3] = 2
             #self.board[4] = 2
             self.board[5] = 1
-            self.board[6] = 1
+            self.board[8] = 1
             self.current_player = 1
 
-        run_test()
+        #run_test()
 
         self.board_string = """
                 | {s1} | {s2} | {s3} |    
@@ -99,12 +99,12 @@ class TicTacToe(gym.Env):
             self.board[3] = 2
             #self.board[4] = 2
             self.board[5] = 1
-            self.board[6] = 1
+            self.board[8] = 1
             self.current_player = 1
 
         self.current_player = 1
 
-        run_test()
+        #run_test()
 
     def render(self, mode="human"):
         board_dict = {f"s{i}": int(self.board[i - 1]) for i in range(1, 10)}

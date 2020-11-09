@@ -50,13 +50,13 @@ def run_agent(config):
     designer = designer(env,agent_config,exp_config)
 
     print("Done loading configurations now running experiment")
-    exp_logger = designer.run()
+    exp_logger,agent = designer.run()
 
     print("Done running experiment")
     if exp_config["plot_data"]:
         print("Showing results")
         exp_logger.plot_metrics()
 
-    return exp_logger
+    return exp_logger,agent
 
 

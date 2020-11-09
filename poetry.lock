@@ -233,6 +233,17 @@ version = "0.6.0"
 
 [[package]]
 category = "main"
+description = "A Graphviz to LaTeX converter"
+name = "dot2tex"
+optional = false
+python-versions = "*"
+version = "2.11.3"
+
+[package.dependencies]
+pyparsing = "*"
+
+[[package]]
+category = "main"
 description = "Discover and load entry points from installed packages."
 name = "entrypoints"
 optional = false
@@ -1704,7 +1715,7 @@ docs = ["sphinx", "jaraco.packaging (>=3.2)", "rst.linker (>=1.9)"]
 testing = ["pytest (>=3.5,<3.7.3 || >3.7.3)", "pytest-checkdocs (>=1.2.3)", "pytest-flake8", "pytest-cov", "jaraco.test (>=3.2.0)", "jaraco.itertools", "func-timeout", "pytest-black (>=0.3.7)", "pytest-mypy"]
 
 [metadata]
-content-hash = "7e3ddb775327a5d599663c63ebdee7913ff4d9a7874df9f8e7087e54dafdf148"
+content-hash = "23b57ddcdf42ad0addbe52351a9be4bfb14213029793bf65d9f1064c8cc197eb"
 python-versions = "^3.7"
 
 [metadata.files]
@@ -1839,6 +1850,10 @@ decorator = [
 defusedxml = [
     {file = "defusedxml-0.6.0-py2.py3-none-any.whl", hash = "sha256:6687150770438374ab581bb7a1b327a847dd9c5749e396102de3fad4e8a3ef93"},
     {file = "defusedxml-0.6.0.tar.gz", hash = "sha256:f684034d135af4c6cbb949b8a4d2ed61634515257a67299e5f940fbaa34377f5"},
+]
+dot2tex = [
+    {file = "dot2tex-2.11.3-py2.py3-none-any.whl", hash = "sha256:6a1f451823b27d331edca733c7f486a1849e97e77b4bafd562443f5c6e6583e2"},
+    {file = "dot2tex-2.11.3.tar.gz", hash = "sha256:299a2af05aee5bbe0257a562a506a93e279293d5c38f28d08ab8acb3233fe7ce"},
 ]
 entrypoints = [
     {file = "entrypoints-0.3-py2.py3-none-any.whl", hash = "sha256:589f874b313739ad35be6e0cd7efde2a4e9b6fea91edcc34e58ecbb8dbe56d19"},

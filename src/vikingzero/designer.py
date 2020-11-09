@@ -419,7 +419,8 @@ class DesignerZero(Designer):
                     self.current_best.save(self.exp_id)
                 else:
                     self.current_player.save(self.exp_id)
-        return self.exp_logger
+
+        return self.exp_logger,self.current_player
 
     def run_eval(self,agent1,agent2,iters,render=False,iter=None):
 

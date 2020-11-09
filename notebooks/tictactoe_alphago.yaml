@@ -17,7 +17,7 @@ agent_config:
     lr: 0.001
     max_mem_size: 10000
     momentum: 0.9
-    n_sim: 2
+    n_sim: 15
     network_path: ""
     network_type: "cnn_small"
     num_channels: 32
@@ -36,7 +36,7 @@ agent_config:
 
 
 exp_config: # experiment config
-  episodes: 5 # total number of episodes to run
+  episodes: 15 # total number of episodes to run
   exp_name: alphago
   logger_type: tensorboard # what source to use for logging experiments.
   neptune_api_token: neptune_api_key
@@ -48,6 +48,6 @@ exp_config: # experiment config
   eval_threshold: 1
   render: false
   run_evaluator: false
-  run_minimax_eval: true
+  run_minimax_eval: false
   save_model: true
-  train_iters: 5 # number of games to play per episode
+  train_iters: 10 # number of games to play per episode

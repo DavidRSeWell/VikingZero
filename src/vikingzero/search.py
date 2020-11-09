@@ -446,7 +446,6 @@ class ZeroMCTS:
         self._env = env
         self._nn = nn
         self._Qsa = defaultdict(float)
-        self._Ns = defaultdict(int)
         self._Nsa = defaultdict(int)
         self._Ps = defaultdict(float)
         self._Vs = defaultdict(float)
@@ -485,7 +484,6 @@ class ZeroMCTS:
         leaf_player = leaf.player
 
         for node, a in reversed(path):
-            self._Ns[node] += 1
             if node == leaf:
                 continue
 
@@ -499,6 +497,10 @@ class ZeroMCTS:
                self._Qsa[(node,a)] -= r
             else:
                self._Qsa[(node,a)] += r
+
+    def calculate_NS(self,node):
+        valid_actions = self._env.valid_actions(node.state)
+        return sum([self._Nsa[(node,a)] for a in valid_actions])
 
     def display_state_info(self,node):
         """
@@ -516,7 +518,7 @@ class ZeroMCTS:
         except:
             print("oppsssy")
         value = self._Vs[node]
-        counts = self._Ns[node]
+        counts = self.calculate_NS(node)
         valid_actions = self._env.valid_actions(node.state)
         blank_board = np.zeros((9,))
         q_board = blank_board.copy()
@@ -659,7 +661,6 @@ class ZeroMCTS:
     def reset_tree(self):
 
         self._Qsa = defaultdict(float)
-        self._Ns = defaultdict(int)
         self._Nsa = defaultdict(int)
         self._Ps = defaultdict(float)
         self._Vs = defaultdict(float)
@@ -716,7 +717,6 @@ class ZeroMCTS:
         while True:
             path.append(node)
             if node not in self.dec_pts:
-                self._Ns[node] = 0 # just init hear will increment during backup
                 return path
 
             node_index = self.dec_pts.index(node)
@@ -789,7 +789,7 @@ class ZeroMCTS:
 
         assert p.sum() > 0.9999
 
-        n_s = self._Ns[node]
+        n_s = self.calculate_NS(node)
 
         if node == self.root and not self.act_max:
 
@@ -820,17 +820,17 @@ class ZeroMCTS:
             r = node.reward()
             return r
 
+        """
         if node in self._Vs:
             r = self._Vs[node]
 
             return r
+        """
+        p,v = self._nn.predict(self._state_encoder(node))
 
-        else:
-            p,v = self._nn.predict(self._state_encoder(node))
+        self._Vs[node] = v
 
-            self._Vs[node] = v
-
-            return v
+        return v
 
     @property
     def points(self):

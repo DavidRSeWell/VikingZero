@@ -200,22 +200,17 @@ class AlphaZero:
         self._eval_threshold = eval_threshold
         self._input_height = input_height
         self._input_width = input_width
+        self._lr = lr
         self._max_mem_size = max_mem_size
         self._mcts_policy_opt = mcts_policy_opt
         self._memory = self.create_memory()
+        self._momentum= momentum
         self._minimax_actions = self.load_lookup(minimax_lookup_path)
         self._network_path = network_path
         self._num_channels = num_channels
         self._nn = self.create_model(input_width,input_height,network_type)
         self._n_sim = n_sim
-        if optimizer == "Adam":
-            self._optimizer = torch.optim.Adam(self._nn.parameters(),lr=lr,weight_decay=weight_decay)
-        elif optimizer == "SGD":
-            self._optimizer = torch.optim.SGD(self._nn.parameters(),lr=lr,momentum=momentum)
-        else:
-            print("Passed incorrect optimizer. Using SGD by default")
-            self._optimizer = torch.optim.SGD(self._nn.parameters(),lr=lr,momentum=momentum)
-
+        self._optimizer = optimizer
         self._softmax = torch.nn.Softmax(dim=1)
         self._state_lookup = self.load_lookup(state_lookup_path)
         self._tau = 1
@@ -223,7 +218,6 @@ class AlphaZero:
         self._t_threshold = t_threshold
         self._v_loss = torch.nn.MSELoss(reduction='sum')
         self._weight_decay = weight_decay
-
         self.MCTS = ZeroMCTS(self._env,self._nn,self.node_to_state,
                              self._c,dir_noise=self._dir_noise,dir_eps=self._epsilon)
 
@@ -654,7 +648,7 @@ class AlphaZero:
 
     def view_current_memory(self):
 
-        last_n = 20
+        last_n = 40
         data = self._memory.memory[-last_n:]
 
         self.show_data_sample(data)
@@ -665,8 +659,13 @@ class AlphaZero:
             return None,None,None
 
         #self.view_current_memory()
-
-        self._nn.train()
+        if self._optimizer == "Adam":
+            optimizer = torch.optim.Adam(self._nn.parameters(), lr=self._lr, weight_decay=self._weight_decay)
+        elif self._optimizer == "SGD":
+            optimizer = torch.optim.SGD(self._nn.parameters(), lr=self._lr, momentum=self._momentum)
+        else:
+            print("Passed incorrect optimizer. Using SGD by default")
+            optimizer = torch.optim.SGD(self._nn.parameters(), lr=self._lr, momentum=self._momentum)
 
         avg_total = 0
         avg_value = 0
@@ -674,13 +673,21 @@ class AlphaZero:
 
         for _ in range(self._epochs):
 
+            self._nn.train()
+
             data = self._memory.sample(self._batch_size)
 
             b, p, v = zip(*[d for d in data])
 
+            #b, p, v = d
+
             target_p = torch.FloatTensor(p)
             target_v = torch.FloatTensor(v)
+            #target_v = torch.FloatTensor([float(v)])
             state = torch.FloatTensor(b)
+
+            #target_p = target_p.reshape((1,9))
+            #state = state.reshape((1,3,3,3))
 
             p, v = self._nn(state)
 
@@ -689,14 +696,30 @@ class AlphaZero:
             loss_policy = self.loss_pi(target_p, p)
 
             loss = loss_value + loss_policy #loss_policy
+            """
+            for i in range(len(data)):
+
+                latent_b,mcts_p,z = data[i]
+                b = self.reverse_transform(latent_b)
+                print("Board")
+                print(b.reshape((3,3)))
+                print("Latent B")
+                print(latent_b)
+                print("MCTS PP")
+                print(mcts_p.reshape((3,3)))
+                print("Predicted PP")
+                print(p[i].detach().numpy().reshape((3,3)))
+                print(f"Game result = {z}")
+                print(f"NN prediction = {float(v[i])}")
+            """
 
             avg_total += loss
             avg_value += loss_value
             avg_policy += loss_policy
 
-            self._optimizer.zero_grad()
+            optimizer.zero_grad()
             loss.backward()
-            self._optimizer.step()
+            optimizer.step()
 
         return avg_total / self._epochs, avg_policy / self._epochs, avg_value / self._epochs
 
@@ -761,10 +784,12 @@ class AlphaZero:
         return policy_correct / num_state , mcts_correct / num_state , mcts_bar_correct / num_state
 
     def loss_pi(self, targets, outputs):
+        assert targets.shape == outputs.shape
         return -torch.sum(targets * outputs) / targets.size()[0]
 
     def loss_v(self, targets, outputs):
-        return torch.sum((targets - outputs) ** 2) / targets.size()[0]
+        assert targets.shape == outputs.view(-1).shape
+        return torch.sum((targets - outputs.view(-1)) ** 2) / targets.size()[0]
 
     @staticmethod
     def load_lookup(path) -> dict:
