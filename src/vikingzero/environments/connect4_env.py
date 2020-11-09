@@ -4,7 +4,7 @@ import gym
 
 class Connect4(gym.Env):
 
-    metadata = {'render.modes': ['human']}
+    metadata = {"render.modes": ["human"]}
 
     def __init__(self,display_board=False):
 
@@ -13,6 +13,8 @@ class Connect4(gym.Env):
         self.board = np.zeros((6,7))
 
         self.current_player = 1
+
+        self.name = "Connect4"
 
         self.winner = None
 
@@ -29,11 +31,11 @@ class Connect4(gym.Env):
         legal_play = np.where(board[:, action] == 0)[0]
 
         if len(legal_play) == 0:
-            print('No legal move')
-            print('BOARD')
+            print("No legal move")
+            print("BOARD")
             print(board)
             print(action)
-            raise Exception(f'Illegal move {action}')
+            raise Exception(f"Illegal move {action}")
 
         else:
             return legal_play[-1]
@@ -43,7 +45,7 @@ class Connect4(gym.Env):
         self.current_player = 1
         self.winner = None
 
-    def render(self, mode='human'):
+    def render(self, mode="human"):
         print(self.board)
 
     def step(self,action):
@@ -63,7 +65,7 @@ class Connect4(gym.Env):
         winner = self.check_winner(next_state)
 
         if winner:
-            self.winner = self.current_player
+            self.winner = winner
 
         self.board = next_state
 
@@ -128,12 +130,12 @@ class Connect4(gym.Env):
 
     @staticmethod
     def check_winner(board: np.array) -> int:
-        '''
+        """
         Check if board contains a winner or draw
         returns () if game is not complete
         :param board:
         :return:
-        '''
+        """
 
         # TODO I threw up a little when I saw all these if statements I wrote
 
@@ -177,10 +179,40 @@ class Connect4(gym.Env):
         return 0
 
     @staticmethod
+    def check_turn(board):
+        """
+        Check whos turn it is to act
+        :param board:
+        :return:
+        """
+        count_1 = len(np.where(board.flatten() == 1)[0])
+        count_2 = len(np.where(board.flatten() == 2)[0])
+
+        if count_1 > count_2:
+            return 2
+        else:
+            return 1
+
+    @staticmethod
+    def is_win(board):
+        #TODO Get rid of this by synch methods with tictactoe
+        return Connect4.check_winner(board)
+
+    @staticmethod
     def valid_actions(s: np.array) -> np.array:
         """
         :param s: numpy array of the state
         :return: numpy array representing the set of valid actions
         """
+
+        if Connect4.is_win(s):
+            return []
+
+        if len(s.shape) == 1:
+            s = s.reshape((6,7))
         return np.where(s[0,:] == 0)[0]
+
+    @staticmethod
+    def actions(s: np.array) -> np.array:
+        return Connect4.valid_actions(s)
 

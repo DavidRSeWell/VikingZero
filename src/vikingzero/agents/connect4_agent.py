@@ -6,7 +6,7 @@ from collections import namedtuple
 
 from ..environments.connect4_env import Connect4
 from ..search import MCTS,MINIMAX,Node
-from ..DNN.nn import UCINet
+from ..connect4_uci_test import Net as UCINet
 
 _CN4 = namedtuple("Connect4Node", "env board player winner")
 
@@ -117,15 +117,23 @@ class Connect4MiniNode(Connect4Node):
 
 class Connect4MCTSNode(Connect4Node):
 
-    def __init__(self, env: Connect4, board: np.array, player: int, winner=0):
+    def __init__(self, env: Connect4, board: np.array, player: int, winner=0,root=False):
         super().__init__(env, Connect4MCTSNode,board, player, winner)
 
+        self.root = root
+
     def reward(self) -> float:
+        """
         if self.winner == -1:
             return 0.5
         elif int(self.winner) != self.player:
             reward = 1
             return reward
+        """
+        if self.winner == -1:
+            return 0
+        else:
+            return 1
 
 
 class Connect4MCTS(MCTS):

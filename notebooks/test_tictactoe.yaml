@@ -1,0 +1,24 @@
+---
+env: TicTacToe
+
+agent_config:
+  agent1:
+    agent: TicTacToeMCTS
+    n_sim: 10
+    player: 1
+    c: 1.41
+
+  agent2:
+    agent: TicTacToeMinMax
+    player: 2
+    type: "alphabeta"
+
+exp_config: # experiment config
+  episodes: 10
+  eval_iters: 1 # number of games to player during evaluation
+  logger_type: tensorboard
+  plot_data: true
+  record_all: true
+  record_every: 1 # how often to record info
+  render: false
+  train_iters: 1 # number of self play games to run each episode

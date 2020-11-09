@@ -1,0 +1,49 @@
+---
+env: Connect4
+#env: TicTacToe
+
+agent_config:
+  agent1:
+    agent: AlphaZero
+    augment_input: true
+    batch_size: 64
+    c: 1.41
+    epochs: 25
+    epsilon: 0
+    dropout: 0.3
+    input_width: 7
+    input_height: 6
+    lr: 0.01
+    max_mem_size: 50000
+    momentum: 0.9
+    n_sim: 25
+    network_path: ""
+    network_type: "cnn"
+    num_channels: 64
+    output_size: 7
+    optimizer: Adam
+    player: 1
+    t_threshold: 6
+    weight_decay: 0
+
+  agent2:
+    agent: Connect4MinMax
+    player: 2
+    type: "alphabeta_depth"
+    depth: 2
+    n_sims: 5
+
+exp_config: # experiment config
+  episodes: 300
+  exp_name: alphago_connect4
+  logger_type: neptune # what source to use for logging experiments.
+  neptune_api_token: eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vdWkubmVwdHVuZS5haSIsImFwaV91cmwiOiJodHRwczovL3VpLm5lcHR1bmUuYWkiLCJhcGlfa2V5IjoiYThhM2FkNmItNGJmOC00NTc3LWI1ZDctNmE1NTYxMDBmMzkyIn0=
+  neptune_name: befeltingu/sandbox
+  record_all: false
+  record_every: 10 # how often to record info
+  eval_iters: 3 # number of games to player during evaluation
+  eval_threshold: 1
+  render: true
+  run_evaluator: false
+  save_model: true
+  train_iters: 100

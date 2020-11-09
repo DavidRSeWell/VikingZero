@@ -1,4 +1,5 @@
 import numpy as np
+import pickle
 
 from vikingzero.agents.connect4_agent import RandomConnect4Agent,Connect4MinMax,Connect4MCTS
 from vikingzero.designers.connect4_designer import Connect4Designer
@@ -38,17 +39,20 @@ def test_designer():
     env = Connect4()
 
     agent1_config = {
-        "agent": Connect4MCTS,
+        "agent": "Connect4MinMax",
         "player": 1,
-        "c": np.sqrt(2),
-        "n_sim": 200
-        # "type": "alphabeta_depth"
+        #"c": np.sqrt(2),
+        #"n_sim": 200
+        "type": "alphabeta_depth",
+        "depth":2,
+        "n_sims": 5
     }
     agent2_config = {
-        "agent": Connect4MinMax,
+        "agent": "Connect4MinMax",
         "player":2,
         "type":"alphabeta_depth",
-        "depth":2
+        "depth":2,
+        "n_sims":5
     }
 
 
@@ -60,14 +64,12 @@ def test_designer():
 
     designer.run(render=True)
 
-
-
-if __name__ == "__main__":
-
-    test_designer()
-
-
-
-
+    agent1_path = ""
+    agent2_path = ""
+    # save
+    f = open(f"{agent1_path}","wb")
+    f2 = open(f"{agent2_path}","wb")
+    pickle.dump(designer.agent1,f)
+    pickle.dump(designer.agent2,f2)
 
 
