@@ -82,6 +82,8 @@ class TicTacToeMinMax(MINIMAX):
 
     def act(self,board):
 
+        assert self._env.current_player == self._env.check_turn(board)
+
         s = TicTacMiniNode(self._env,board,self._env.current_player)
 
         a = self.run(s,type=self._type)

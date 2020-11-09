@@ -228,7 +228,6 @@ class MINIMAX:
             res.append((child,v))
             continue
 
-
         max_c = max(res,key=itemgetter(1))
 
         all_maxes = [child[0] for child in res if child[1] == max_c[1]]

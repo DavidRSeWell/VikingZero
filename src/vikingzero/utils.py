@@ -87,10 +87,11 @@ def create_minimax_lookup(save_path,state_dict_path=""):
     else:
         states = generate_tictactoe_state_dict()
 
-
     minimax_actions = {}
 
     for k,v in states.items():
+
+        env.current_player = env.check_turn(v)
 
         valid_actions = env.valid_actions(v)
 
