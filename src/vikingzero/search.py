@@ -625,7 +625,7 @@ class ZeroMCTS:
             max_index = np.random.choice(max_children) # might be more than one with same p value
             p_action = children[max_index].parent_action
             p_all[p_action] = 1
-
+            #p_all[valid_actions] = p
             return p_action,p_all
 
         p_all[valid_actions] = p

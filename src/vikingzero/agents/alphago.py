@@ -357,14 +357,6 @@ class AlphaZero:
         if self._act_max or (self._current_moves > self._t_threshold):
             a, p = tree.policy(s, self._tau, max=True)
 
-            if self._act_max:
-                print("Selection Action for Node....")
-                print(s)
-                self.MCTS.display_state_info(s)
-
-                print(f"chose action {a}")
-                print(p.reshape((3,3)))
-
         else:
             a, p = tree.policy(s, self._tau)
 

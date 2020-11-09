@@ -367,11 +367,11 @@ class DesignerZero(Designer):
 
             if (iter % self._record_every) == 0:
                 # Evaluate
-                print(" ---------- Eval as player 1 vs minimax ---------")
+                #print(" ---------- Eval as player 1 vs minimax ---------")
                 p1_result = self.run_eval(self.current_player, self.agent2,self._eval_iters,iter=iter)
                 vs_minimax.append(p1_result)
 
-                print(" ---------- Eval as player 2 vs minimax ---------")
+                #print(" ---------- Eval as player 2 vs minimax ---------")
                 p2_result = self.run_eval(self.agent2, self.current_player, self._eval_iters, iter=iter)
                 p2_result *= -1
                 vs_minimax.append(p2_result)
@@ -379,9 +379,9 @@ class DesignerZero(Designer):
                 iter_metrics["tot_p1_wins"] = p1_result
                 iter_metrics["tot_p2_wins"] = p2_result
 
-            print("---------- Current Player vs Current Best ____________ ")
 
             if self._run_evaluator:
+                #print("---------- Current Player vs Current Best ____________ ")
                 curr_result = self.run_eval(self.current_player,self.current_best,10,iter=iter)
 
                 curr_result2 = self.run_eval(self.current_best,self.current_player,10,iter=iter)
@@ -405,6 +405,7 @@ class DesignerZero(Designer):
                     self.current_best.save(self.exp_id)
                 else:
                     self.current_player.save(self.exp_id)
+
         return self.exp_logger
 
     def run_eval(self,agent1,agent2,iters,render=False,iter=None):
