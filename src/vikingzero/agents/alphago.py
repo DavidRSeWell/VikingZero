@@ -6,6 +6,7 @@ except:
     pass
 import numpy as np
 import random
+import time
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -149,63 +150,6 @@ class CnnNNet(nn.Module):
         return p,v[0]
 
 
-class Network(nn.Module):
-
-    def __init__(self,input_size,output_size):
-        super().__init__()
-
-        self._input_size = input_size
-        self._output_size = output_size
-        # This represents the shared layer(s) before the different heads
-        # Here, I used a single linear layer for simplicity purposes
-        # But any network configuration should work
-        self.h1 = nn.Linear(input_size, input_size*2)
-        self.h2 = nn.Linear(input_size*2, input_size*3)
-        self.h3 = nn.Linear(input_size*3, input_size*4)
-        self.h4 = nn.Linear(input_size*4, input_size*3)
-        self.h5 = nn.Linear(input_size*3, input_size*2)
-        self.h6 = nn.Linear(input_size*2, input_size)
-        #self.h4 = nn.Linear(18, 9)
-
-        # Set up the different heads
-        # Each head can take any network configuration
-        self.policy = nn.Linear(input_size , output_size)
-        self.value = nn.Linear(input_size, 1)
-
-    def forward(self, x):
-
-        x[x == 2] = -1
-        # Run the shared layer(s)
-        x = x.view(-1, self._input_size)
-        x = F.relu(self.h1(x))
-        x = F.relu(self.h2(x))
-        x = F.relu(self.h3(x))
-        x = F.relu(self.h4(x))
-        x = F.relu(self.h5(x))
-        x = F.relu(self.h6(x))
-
-        # Run the different heads with the output of the shared layers as input
-        p = F.log_softmax(self.policy(x), dim=1)
-        value_out = torch.tanh(self.value(x))
-
-        return p, value_out
-
-    def predict(self, board):
-        """
-        board: np array with board
-        """
-        # timing
-        # preparing input
-        #board = board.view(1, self.board_y, self.board_x)
-        self.eval()
-        with torch.no_grad():
-            pi, v = self.forward(board)
-
-        p, v = torch.exp(pi).data.cpu().numpy()[0], v.data.cpu().numpy()[0]
-
-        return p, v[0]
-
-
 class ReplayMemory(object):
 
     def __init__(self, capacity):
@@ -224,18 +168,6 @@ class ReplayMemory(object):
         data = random.sample(self.memory, batch_size)
         return [(d.state,d.action_mcts,d.z) for d in data]
 
-    def save(self,path):
-
-        for d in self.memory:
-            print("---------BOARD-------------")
-            state = d.state.reshape((3,3))
-            print(state)
-            print("Result value")
-            print(f"Z = {d.z}")
-            print("Action Probs")
-            print(f"{d.action_mcts}")
-
-
     def __len__(self):
         return len(self.memory)
 
@@ -244,9 +176,10 @@ class AlphaZero:
 
     def __init__(self,env, augment_input: bool = True, n_sim: int = 50, batch_size: int = 10,max_mem_size: int = 1000,
                  epochs: int = 10, c: int = 1, lr: float = 0.001, epsilon: float = 0.2,input_width: int = 3, input_height: int = 3,
-                 output_size: int = 9,player: int = 1,momentum: float = 0.9, network_type: str = "normal",optimizer: str = "Adam", t_threshold: int = 10
+                 output_size: int = 9,player: int = 1,momentum: float = 0.9, network_type: str = "cnn_small",optimizer: str = "Adam", t_threshold: int = 10
                  ,test_name: str = "current",num_channels: int = 512, dropout: float = 0.3, weight_decay: float = 0.001,
-                 eval_threshold: int = 1, dirichlet_noise: float = 0.3, network_path: str = ""):
+                 eval_threshold: int = 1, dirichlet_noise: float = 0.3, network_path: str = "", mcts_policy_opt: bool = False, minimax_lookup_path="",
+                 state_lookup_path=""):
 
         self.current_state = None # Used for tracking state. Used for tree lookup
         self.prev_state = None
@@ -267,46 +200,46 @@ class AlphaZero:
         self._eval_threshold = eval_threshold
         self._input_height = input_height
         self._input_width = input_width
+        self._lr = lr
         self._max_mem_size = max_mem_size
+        self._mcts_policy_opt = mcts_policy_opt
         self._memory = self.create_memory()
+        self._momentum= momentum
+        self._minimax_actions = self.load_lookup(minimax_lookup_path)
         self._network_path = network_path
         self._num_channels = num_channels
-        self._nn = self.create_model(input_width,input_height,output_size,network_type)
+        self._nn = self.create_model(input_width,input_height,network_type)
         self._n_sim = n_sim
-        if optimizer == "Adam":
-            self._optimizer = torch.optim.Adam(self._nn.parameters(),lr=lr,weight_decay=weight_decay)
-        elif optimizer == "SGD":
-            self._optimizer = torch.optim.SGD(self._nn.parameters(),lr=lr,momentum=momentum)
-        else:
-            print("Passed incorrect optimizer. Using SGD by default")
-            self._optimizer = torch.optim.SGD(self._nn.parameters(),lr=lr,momentum=momentum)
-
+        self._optimizer = optimizer
         self._softmax = torch.nn.Softmax(dim=1)
+        self._state_lookup = self.load_lookup(state_lookup_path)
         self._tau = 1
         self._test_name = test_name
         self._t_threshold = t_threshold
         self._v_loss = torch.nn.MSELoss(reduction='sum')
         self._weight_decay = weight_decay
-
         self.MCTS = ZeroMCTS(self._env,self._nn,self.node_to_state,
                              self._c,dir_noise=self._dir_noise,dir_eps=self._epsilon)
 
     def act(self,state):
 
-        self.current_state = state.copy()
+        s = self.run_search(state)
 
-        s = self.get_node(self.current_state)
+        if self._mcts_policy_opt:
+            s_time = time.time()
+            a ,p_a = self.compute_pi_bar(s)
+            e_time = time.time()
+            rt = (e_time - s_time) / 60.0
+            #print(f"MCTS POLICY OPT RT = {rt}")
 
-        self.MCTS.root = s
-        # First run simulations to collect
-        # Tree statistics
-        for _ in range(self._n_sim):
+        else:
+            s_time = time.time()
+            a, p_a = self.get_action(s)
+            e_time = time.time()
+            rt = (e_time - s_time) / 60.0
+            #print(f"Rt norm = {rt}")
 
-            self.MCTS.run(s)
-
-        a,p_a = self.get_action(s)
-
-        state = self.processs_state(state)
+        state = self.process_state(state)
 
         assert p_a.sum() > 0.9999
 
@@ -320,12 +253,139 @@ class AlphaZero:
 
         return a, p_a
 
-    def create_model(self,width,height,output_size,nn_type):
+    def compute_pi_bar(self, s) -> tuple:
+        """
+        Compute pi bar as described in the paper
+        MCTS as regularized policy optimization
+        https://arxiv.org/abs/2007.12509
+        """
 
-        if nn_type == "normal":
-            input_size = width*height*3
-            return Network(input_size,output_size)
-        elif nn_type == "cnn":
+        def compute_lambda_multiplier(mcts, node, env) -> float:
+
+            valid_actions = env.valid_actions(node.state)
+
+            n = 0
+            for a in valid_actions:
+                n += mcts._Nsa[(node, a)]
+
+            return self._c*np.sqrt(n) / (n + len(valid_actions))
+
+        def compute_pi_alpha(p_nn, L, q, alpha):
+
+            q = np.array(q)
+            if q.sum() == 0:
+                print("No q values!")
+            p_nn = np.array(p_nn)
+            denom = alpha - q
+            denom[denom == 0] = -0.001
+            assert 0 not in denom
+            return L * p_nn / denom
+
+        def find_max_min_alpha(p_a, L, q):
+
+            a = q + L * p_a
+
+            a = a[a != 0]
+
+            min_alpha = np.max(a)
+
+            b = q + L
+
+            max_alpha = np.max(b)
+
+            if min_alpha == 0:
+                #min_alpha += 0.0000001
+                pass
+
+            return min_alpha, max_alpha
+
+        def get_qa(mcts, node, p_nn):
+
+            valid_actions = self._env.valid_actions(node.state)
+
+            q = np.zeros((self._env.action_size,))
+
+            qa = [mcts._Qsa[(node, a)] for a in valid_actions]
+
+            q[valid_actions] = qa
+
+            q = (q - np.min(q)) / (np.max(q) - np.min(q))
+
+            p_nn[[a for a in range(self._env.action_size) if a not in valid_actions]] = 0
+
+            p_nn /= p_nn.sum()
+
+            return q, p_nn
+
+        def find_max_alpha(node, env, mcts, p_nn) -> tuple:
+
+            l_n = compute_lambda_multiplier(mcts, node, env)
+
+            q, p_nn = get_qa(mcts, node, p_nn)
+
+            min_a, max_a = find_max_min_alpha(p_nn, l_n, q)
+
+
+            alpha_star = min_a
+
+            delta = 10000
+            pi_bar = None
+            half = None
+
+            epsilon = 0.01
+
+            while True:
+
+                if min_a == max_a:
+                    return half,pi_bar
+                half_distance = (min_a - max_a) / 2.0
+                half = min_a - half_distance
+
+                pi_bar = compute_pi_alpha(p_nn, l_n, q, half)
+
+                if pi_bar.sum() > (1 + epsilon):
+
+                    min_a = half
+
+                elif pi_bar.sum() < (1 - epsilon):
+
+                    max_a = half
+
+                else:
+                    #print("Found max alpha! ")
+                    #print(half)
+                    break
+
+            return half, pi_bar
+
+        p_nn, v = self.predict(s)
+
+        valid_actions = self._env.valid_actions(s.state)
+
+        mask = [a for a in range(p_nn.shape[0]) if a not in valid_actions]
+
+        p_nn[mask] = 0
+
+        p_nn = p_nn / p_nn.sum()
+
+        max_alpha, pi_bar = find_max_alpha(s, self._env, self.MCTS, p_nn)
+
+        pi_bar[mask] = 0
+
+        pi_bar = pi_bar / pi_bar.sum()
+
+        if self._act_max:
+            max_child = np.argmax(pi_bar)
+            pi_bar = np.zeros((self._env.action_size,))
+            pi_bar[max_child] = 1
+
+        random_child = np.random.choice(pi_bar,p=pi_bar)
+
+        return np.where(pi_bar == random_child)[0][0], pi_bar
+
+    def create_model(self,width,height,nn_type):
+
+        if nn_type == "cnn":
             model =  CnnNNet(width,height,self._action_size,self._num_channels,self._dropout)
         elif nn_type == "cnn_small":
             model =  CnnNNetSmall(width, height, self._action_size, self._num_channels, self._dropout)
@@ -341,7 +401,23 @@ class AlphaZero:
     def create_memory(self):
         return ReplayMemory(self._max_mem_size)
 
+    def display_state_info(self,state,action):
+        """
+        Display value of current state
+        """
+
+        player = self._env.check_turn(state)
+        winner = self._env.check_winner(state)
+
+        node = ZeroNode(state=state, player=player, winner=winner, parent=None, parent_action=action)
+
+        self.MCTS.display_state_info(node)
+
     def eval(self):
+        """
+        Used when evaluating the agent to ensure
+        the action acts greedily
+        """
         self._act_max = True
         self.MCTS.act_max = True
 
@@ -357,18 +433,40 @@ class AlphaZero:
         if self._act_max or (self._current_moves > self._t_threshold):
             a, p = tree.policy(s, self._tau, max=True)
 
-            if self._act_max:
-                print("Selection Action for Node....")
-                print(s)
-                self.MCTS.display_state_info(s)
-
-                print(f"chose action {a}")
-                print(p.reshape((3,3)))
-
         else:
             a, p = tree.policy(s, self._tau)
 
         return a , p
+
+    def get_child_values(self,state):
+
+        og_state = self.reverse_transform(state)
+
+        valid_actions = self._env.valid_actions(og_state)
+
+        child_states = [self._env.next_state(og_state,a) for a in valid_actions]
+
+        child_states = [self.transform_state(c) for c in child_states]
+
+        child_states = [torch.FloatTensor(c) for c in child_states]
+
+        vs = [self._nn.predict(c)[1] for c in child_states]
+
+        p = np.zeros((9,))
+
+        p[valid_actions] = vs
+
+        return p
+
+    def get_policy_action(self,state):
+        """
+        Select best action just from policy network
+        """
+        state = self.process_state(state)
+        state = Variable(torch.from_numpy(state).type(dtype=torch.float))
+        p , v = self._nn.predict(state)
+
+        return np.argmax(p)
 
     def get_node(self,state):
         """
@@ -384,8 +482,8 @@ class AlphaZero:
 
         root = ZeroNode(state=state, player=player, winner=winner, parent=None, parent_action=parent_action)
 
+        if root not in self.MCTS.dec_pts:
 
-        if len(self.MCTS.dec_pts) == 0:
             self.MCTS.children.append([])
             self.MCTS.dec_pts.append(root)
             self.MCTS.parents.append(None)
@@ -424,7 +522,7 @@ class AlphaZero:
     def node_to_state(self,s):
 
         state = s.state
-        state = self.processs_state(state)
+        state = self.process_state(state)
         state = Variable(torch.from_numpy(state).type(dtype=torch.float))
 
         return state
@@ -433,9 +531,7 @@ class AlphaZero:
         state = self.node_to_state(s)
         return self._nn.predict(state)
 
-    def processs_state(self,state):
-
-        state = state.reshape((self._input_height, self._input_width))
+    def process_state(self,state):
 
         if self._augment_input:
             state = self.transform_state(state)
@@ -475,16 +571,26 @@ class AlphaZero:
 
         # first state in transformed state is player 1
         p1_actions = np.where(state[0].flatten() == 1)[0]
-        #if len(p1_actions) > 0:
-        #    p1_actions = p1_actions[0]
         state_original[p1_actions] = 1
         p2_actions = np.where(state[1].flatten() == 1)[0]
-        #if len(p2_actions) > 0:
-        #    p2_actions = p2_actions[0]
 
         state_original[p2_actions] = 2
 
         return state_original
+
+    def run_search(self,state):
+
+        self.current_state = state.copy()
+
+        s = self.get_node(self.current_state)
+
+        self.MCTS.root = s
+        # First run simulations to collect
+        # Tree statistics
+        for _ in range(self._n_sim):
+            self.MCTS.run(s)
+
+        return s
 
     def save(self,id):
         torch.save(self._nn.state_dict(), f"current_best_{self._env.name}_{id}")
@@ -496,15 +602,23 @@ class AlphaZero:
         :return:
         """
 
-        for data in sample:
-            b , p , v = data
+        self._nn.eval()
 
-            state = self.reverse_transform(b)
+        for data in sample:
+            p, v = self._nn.predict(torch.FloatTensor(data.state))
+            state = self.reverse_transform(data.state)
             print("-----------------state---------------------")
             print(state.reshape((3,3)))
             print("MCTS PROBS")
-            print(p.reshape((3,3)))
-            print(f"Value = {v}")
+            print(data.action_mcts)
+            print("NN P")
+            print(p.reshape(3,3))
+            print(f"True Value = {data.z}")
+            print("NN V")
+            print(v)
+            print("Children Values")
+            child_values = self.get_child_values(data.state)
+            print(child_values.reshape((3,3)))
 
     def store_memory(self,z):
         """
@@ -528,42 +642,30 @@ class AlphaZero:
             else:
                 raise Exception("Incorrect winner passed")
 
-            """
-            if z == 2:
-                print("player 2 won")
-            print("--------- MEM STATE ----------------")
-            #print(mem.state.reshape((self._input_height, self._input_width)))
-            print(mem.state)
-            print("--------- state STATE ----------------")
-            print(state.reshape((3,3)))
-            print(f"Turn = {p_turn}")
-            print(f"z = {z}")
-            print(f"mem.z = {mem.z}")
-            """
             self._memory.push(mem)
 
         self.reset_current_memory()
 
     def view_current_memory(self):
 
-        last_n = 20
+        last_n = 40
         data = self._memory.memory[-last_n:]
 
-        for d in data:
-            b,p,v = d.state,d.action_mcts,d.z
-            state = self.reverse_transform(b)
-            print("-----------------state---------------------")
-            print(state.reshape((3, 3)))
-            print("MCTS PROBS")
-            print(p.reshape((3, 3)))
-            print(f"Value = {v}")
+        self.show_data_sample(data)
 
     def train_network(self):
 
-        self._nn.train()
-
         if len(self._memory) < self._batch_size:
             return None,None,None
+
+        #self.view_current_memory()
+        if self._optimizer == "Adam":
+            optimizer = torch.optim.Adam(self._nn.parameters(), lr=self._lr, weight_decay=self._weight_decay)
+        elif self._optimizer == "SGD":
+            optimizer = torch.optim.SGD(self._nn.parameters(), lr=self._lr, momentum=self._momentum)
+        else:
+            print("Passed incorrect optimizer. Using SGD by default")
+            optimizer = torch.optim.SGD(self._nn.parameters(), lr=self._lr, momentum=self._momentum)
 
         avg_total = 0
         avg_value = 0
@@ -571,13 +673,21 @@ class AlphaZero:
 
         for _ in range(self._epochs):
 
+            self._nn.train()
+
             data = self._memory.sample(self._batch_size)
 
             b, p, v = zip(*[d for d in data])
 
+            #b, p, v = d
+
             target_p = torch.FloatTensor(p)
             target_v = torch.FloatTensor(v)
+            #target_v = torch.FloatTensor([float(v)])
             state = torch.FloatTensor(b)
+
+            #target_p = target_p.reshape((1,9))
+            #state = state.reshape((1,3,3,3))
 
             p, v = self._nn(state)
 
@@ -586,15 +696,30 @@ class AlphaZero:
             loss_policy = self.loss_pi(target_p, p)
 
             loss = loss_value + loss_policy #loss_policy
+            """
+            for i in range(len(data)):
+
+                latent_b,mcts_p,z = data[i]
+                b = self.reverse_transform(latent_b)
+                print("Board")
+                print(b.reshape((3,3)))
+                print("Latent B")
+                print(latent_b)
+                print("MCTS PP")
+                print(mcts_p.reshape((3,3)))
+                print("Predicted PP")
+                print(p[i].detach().numpy().reshape((3,3)))
+                print(f"Game result = {z}")
+                print(f"NN prediction = {float(v[i])}")
+            """
 
             avg_total += loss
             avg_value += loss_value
             avg_policy += loss_policy
 
-            self._optimizer.zero_grad()
+            optimizer.zero_grad()
             loss.backward()
-            self._optimizer.step()
-
+            optimizer.step()
 
         return avg_total / self._epochs, avg_policy / self._epochs, avg_value / self._epochs
 
@@ -619,11 +744,57 @@ class AlphaZero:
         self.prev_state = prev_state
         self.current_state = curr_state
 
+    def loss_minimax(self):
+        """
+            Compute loss of agent actions vs minimax agents actions
+        """
+        s_t = time.time()
+        self.eval()
+        num_state = len(self._minimax_actions)
+        policy_correct = 0.0
+        mcts_correct = 0.0
+        mcts_bar_correct = 0.0
+        for k,v in self._minimax_actions.items():
+            state = self._state_lookup[k]
+            policy_a = self.get_policy_action(state)
+            #print(state.reshape(3,3))
+            minimax_action = self._minimax_actions[k]
+            #print(minimax_action)
+            if policy_a in minimax_action:
+                policy_correct += 1
+            self.reset()
+            s = self.run_search(state)
+            #bar_a, pi_bar = self.compute_pi_bar(s)
+
+            mcts_a, mcts_pi = self.get_action(s)
+
+            #if bar_a in self._minimax_actions[k]:
+            #    mcts_bar_correct += 1
+
+            if mcts_a in self._minimax_actions[k]:
+                mcts_correct += 1
+
+        e_t = time.time()
+
+        run_time = (e_t - s_t) / 60.0
+
+        print("Loss minimax runtime")
+        print(run_time)
+        self.train()
+        return policy_correct / num_state , mcts_correct / num_state , mcts_bar_correct / num_state
+
     def loss_pi(self, targets, outputs):
+        assert targets.shape == outputs.shape
         return -torch.sum(targets * outputs) / targets.size()[0]
 
     def loss_v(self, targets, outputs):
+        assert targets.shape == outputs.view(-1).shape
+        return torch.sum((targets - outputs.view(-1)) ** 2) / targets.size()[0]
 
-        return torch.sum((targets - outputs) ** 2) / targets.size()[0]
+    @staticmethod
+    def load_lookup(path) -> dict:
 
-
+        if len(path) > 0:
+            return np.load(path, allow_pickle=True).item()
+        else:
+            return {}

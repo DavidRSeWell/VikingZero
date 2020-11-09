@@ -38,7 +38,7 @@ def run_agent(config):
 
     exp_config = data["exp_config"]
 
-    designer = None
+    designer = Designer
 
     agent1 = agent_config["agent1"]["agent"]
     agent2 = agent_config["agent2"]["agent"]
@@ -46,17 +46,17 @@ def run_agent(config):
     if "AlphaZero" in (agent1, agent2):
         print("Running AlphaGO Zero Experiment. Loading Appropriate designer")
         designer = DesignerZero
-    else:
-        designer = Designer
 
     designer = designer(env,agent_config,exp_config)
 
     print("Done loading configurations now running experiment")
-    exp_logger = designer.run()
+    exp_logger,agent = designer.run()
 
     print("Done running experiment")
     if exp_config["plot_data"]:
+        print("Showing results")
         exp_logger.plot_metrics()
 
-    print("Showing results")
+    return exp_logger,agent
+
 

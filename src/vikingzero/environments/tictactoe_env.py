@@ -31,8 +31,8 @@ class TicTacToe(gym.Env):
             #self.board[0] = 1
             #self.board[1] = 2
             self.board[0] = 2
-            #self.board[3] = 1
-            self.board[4] = 2
+            self.board[3] = 2
+            #self.board[4] = 2
             self.board[5] = 1
             self.board[8] = 1
             self.current_player = 1
@@ -96,8 +96,8 @@ class TicTacToe(gym.Env):
             #self.board[0] = 1
             # self.board[1] = 2
             self.board[0] = 2
-            # self.board[3] = 1
-            self.board[4] = 2
+            self.board[3] = 2
+            #self.board[4] = 2
             self.board[5] = 1
             self.board[8] = 1
             self.current_player = 1
@@ -150,6 +150,8 @@ class TicTacToe(gym.Env):
 
     @staticmethod
     def valid_actions(board):
+        if TicTacToe.is_win(board):
+            return []
         return np.where(board == 0.0)[0]
 
     @staticmethod

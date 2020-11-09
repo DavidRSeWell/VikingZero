@@ -1,11 +1,12 @@
 import copy
 import time
 import matplotlib.pyplot as plt
-import numbers
 
+from collections.abc import Iterable
+from datetime import datetime
 from tqdm import tqdm
 
-# code in place if someone wants to use neptune to track
+# code in place if someone wants to use neptune to track experiments
 try:
     import neptune
 except:
@@ -21,12 +22,12 @@ class ExpLogger:
     during and after an experiment is run. Acts as a go
     between for the designer and experiment data.
     """
+
     def __init__(self,exp_config,agent_config):
         self._agent_config = agent_config
         self._exp_config = exp_config
-        self._exp_metrics = {}
+        self._exp_metrics = {"time": datetime.now()}
         self._run = None
-
         self.load_logger()
 
     def init_neptune(self):
@@ -49,12 +50,8 @@ class ExpLogger:
         return neptune.get_experiment()
 
     def init_tensorboard(self):
-        #from torch.utils.tensorboard import SummaryWriter
         from tensorboardX import SummaryWriter
 
-        #exp_name = self._exp_config["exp_name"]
-        # default `log_dir` is "runs" - we'll be more specific here
-        #writer = SummaryWriter(f'runs/{exp_name}')
         writer = SummaryWriter()
 
         data = {
@@ -64,8 +61,6 @@ class ExpLogger:
 
         writer.add_hparams(self._exp_config,{})
         writer.add_hparams(self._agent_config,{})
-
-        #writer.add_hparams(data)
 
         return writer
 
@@ -102,8 +97,8 @@ class ExpLogger:
 
     def log_metrics(self,iter,iter_metrics):
 
-        if len(self._exp_metrics.keys()) == 0:
-            for k , v in iter_metrics.items():
+        for k , v in iter_metrics.items():
+            if k not in self._exp_metrics:
                 self._exp_metrics[k] = []
 
         logger_type = self._exp_config["logger_type"]
@@ -115,31 +110,32 @@ class ExpLogger:
             self.log_tensorboard_metrics(iter,iter_metrics)
 
         elif logger_type == "both":
-            self.log_neptune_metrics(iter,iter_metrics)
+            self.log_neptune_metrics(iter_metrics)
             self.log_tensorboard_metrics(iter,iter_metrics)
 
         # Log to self iter_metric regardless of logger type
         for k, v in iter_metrics.items():
             self.log_metric(k,v)
 
-        return
+        return None
 
     def log_neptune_metrics(self,iter_metrics):
         for key , value in iter_metrics.items():
-            #if isinstance(value, numbers.Number):
             if value or value == 0:
                 neptune.log_metric(key,value)
 
     def log_tensorboard_metrics(self,iter,iter_metrics):
 
         for key , value in iter_metrics.items():
-            #if isinstance(value, numbers.Number):
             if value or value == 0:
                 self._run.add_scalar(key,value,iter)
 
     def plot_metrics(self):
         for k,v in self._exp_metrics.items():
-            plt.plot(self._exp_metrics[k])
+            if not isinstance(v,Iterable):
+                continue
+            v = [x for x in v if x is not None]
+            plt.plot(v)
             plt.title(k)
             plt.legend()
             plt.show()
@@ -203,8 +199,7 @@ class Designer:
 
     def run(self):
         """
-        :param _run: Used in conjunction with sacred for recording tests
-        :return:
+        :return: ExpLogger - Metrics logged during run
         """
 
         for iter in tqdm(range(self._iters)):
@@ -220,12 +215,11 @@ class Designer:
                 p2_r = self.run_eval(self.agent2,self.agent1,self._eval_iters,render=self._render,iter=iter)
 
                 iter_metrics["tot_p1_wins"] = p1_r
-                iter_metrics["tot_p2_wins"] = p2_r
+                iter_metrics["tot_p2_wins"] = -1*p2_r
 
                 self.exp_logger.log_metrics(iter,iter_metrics)
 
-            #TODO Allow for self-play as a setting
-            self.train(self._train_iters,self.agent1)
+            self.train(self.agent1,self._train_iters)
 
         return self.exp_logger
 
@@ -262,13 +256,13 @@ class DesignerZero(Designer):
         self._agent_config = agent_config
         self._exp_config = exp_config
         self._run_evaluator = exp_config["run_evaluator"]
+        self._run_minimax_eval = exp_config["run_minimax_eval"]
         self._save_model = exp_config["save_model"]
         self._train_iters = exp_config["train_iters"]
         self.current_best = self.load_agent(self._agent1_config)
         self.current_player = copy.deepcopy(self.current_best)
         self.eval_threshold = exp_config["eval_threshold"]
         self.exp_id = None
-        #self.exp_id = self.load_exp_id()
 
         ###########
         # LOSS
@@ -276,6 +270,29 @@ class DesignerZero(Designer):
         self.avg_loss = []
         self.avg_value_loss = []
         self.avg_policy_loss = []
+
+    def compute_metrics(self,iter_metrics) -> tuple:
+
+        # Evaluate
+        if self._render:
+            print(" ---------- Eval as player 1 vs minimax ---------")
+        p1_result = self.run_eval(self.current_player, self.agent2,self._eval_iters,iter=iter)
+
+        if self._render:
+            print(" ---------- Eval as player 2 vs minimax ---------")
+        p2_result = self.run_eval(self.agent2, self.current_player, self._eval_iters, iter=iter)
+        p2_result *= -1
+
+        iter_metrics["tot_p1_wins"] = p1_result
+        iter_metrics["tot_p2_wins"] = p2_result
+
+        if self._run_minimax_eval:
+            policy_correct, mcts_correct, mcts_bar_correct = self.current_player.loss_minimax()
+            iter_metrics["policy_minimax_score"] = policy_correct
+            iter_metrics["mcts_minimax_score"] = mcts_correct
+            #iter_metrics["mcts_bar_minimax_score"] = mcts_bar_correct
+
+        return iter_metrics
 
     def play_game(self,render,agent1,agent2,iter=None,game_num=0):
 
@@ -289,6 +306,8 @@ class DesignerZero(Designer):
         curr_player = agent1
 
         game_array = []
+
+        last_action = None
 
         while True:
 
@@ -306,8 +325,12 @@ class DesignerZero(Designer):
             if hasattr(agent1,"update_state"):
                 agent1.update_state(curr_state,next_state)
 
-            if hasattr(agent2, "update_state"):
-                agent2.update_state(curr_state, next_state)
+            if hasattr(agent2,"update_state"):
+                agent2.update_state(curr_state,next_state)
+
+            if render and hasattr(curr_player, "display_state_info"):
+                curr_player.display_state_info(curr_state,last_action)
+                print(f"Agent chose action ={action}")
 
             if render:
                 game_array.append(self.env.board.copy().tolist())
@@ -317,6 +340,8 @@ class DesignerZero(Designer):
                 break
 
             curr_player = agent2 if curr_player == agent1 else agent1
+
+            last_action = action
 
         return self.env.winner
 
@@ -330,8 +355,9 @@ class DesignerZero(Designer):
 
         # Initialize run by training a current best agent
 
-        vs_minimax = []
-        vs_best = []
+        iter_metrics = self.compute_metrics({})
+        self.exp_logger.log_metrics(0, iter_metrics)
+
         for iter in tqdm(range(self._iters)):
 
             print(f"Running iteration {iter}")
@@ -356,9 +382,9 @@ class DesignerZero(Designer):
             s_time = time.time()
             avg_total, avg_policy, avg_val = self.current_player.train_network()
 
-            iter_metrics["Total Loss"] = avg_total
-            iter_metrics["Policy Loss"] = avg_policy
-            iter_metrics["Value Loss"] = avg_val
+            iter_metrics["Total Loss"] = float(avg_total)
+            iter_metrics["Policy Loss"] = float(avg_policy)
+            iter_metrics["Value Loss"] = float(avg_val)
 
 
             e_time = time.time()
@@ -366,29 +392,17 @@ class DesignerZero(Designer):
             print(f"Training network time ={min_time}")
 
             if (iter % self._record_every) == 0:
-                # Evaluate
-                print(" ---------- Eval as player 1 vs minimax ---------")
-                p1_result = self.run_eval(self.current_player, self.agent2,self._eval_iters,iter=iter)
-                vs_minimax.append(p1_result)
 
-                print(" ---------- Eval as player 2 vs minimax ---------")
-                p2_result = self.run_eval(self.agent2, self.current_player, self._eval_iters, iter=iter)
-                p2_result *= -1
-                vs_minimax.append(p2_result)
-
-                iter_metrics["tot_p1_wins"] = p1_result
-                iter_metrics["tot_p2_wins"] = p2_result
-
-            print("---------- Current Player vs Current Best ____________ ")
+                iter_metrics = self.compute_metrics(iter_metrics)
 
             if self._run_evaluator:
+                print("---------- Current Player vs Current Best ____________ ")
+
                 curr_result = self.run_eval(self.current_player,self.current_best,10,iter=iter)
 
                 curr_result2 = self.run_eval(self.current_best,self.current_player,10,iter=iter)
 
                 tot_result = curr_result + -1*curr_result2
-
-                vs_best.append(tot_result)
 
                 if (tot_result >= self.eval_threshold):
                     print(f"Changing Agent on iteration = {iter}")
@@ -398,14 +412,15 @@ class DesignerZero(Designer):
                     self.current_player = copy.deepcopy(self.current_best)
 
             # Record metrics each iteration
-            self.exp_logger.log_metrics(iter,iter_metrics)
+            self.exp_logger.log_metrics(iter + 1,iter_metrics)
 
             if self._save_model:
                 if self._run_evaluator:
                     self.current_best.save(self.exp_id)
                 else:
                     self.current_player.save(self.exp_id)
-        return self.exp_logger
+
+        return self.exp_logger,self.current_player
 
     def run_eval(self,agent1,agent2,iters,render=False,iter=None):
 

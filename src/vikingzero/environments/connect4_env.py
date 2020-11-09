@@ -205,6 +205,9 @@ class Connect4(gym.Env):
         :return: numpy array representing the set of valid actions
         """
 
+        if Connect4.is_win(s):
+            return []
+
         if len(s.shape) == 1:
             s = s.reshape((6,7))
         return np.where(s[0,:] == 0)[0]
