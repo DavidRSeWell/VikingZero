@@ -4,7 +4,7 @@ env: TicTacToe
 agent_config:
   agent1:
     agent: TicTacToeMCTS
-    n_sim: 2
+    n_sim: 10
     player: 1
     c: 1.41
 

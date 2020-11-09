@@ -221,7 +221,7 @@ class Designer:
 
             self.train(self.agent1,self._train_iters)
 
-        return self.exp_logger
+        return self.exp_logger, self.agent1
 
     def run_eval(self,agent1,agent2,iters,render=False,iter=None):
         """
@@ -271,7 +271,7 @@ class DesignerZero(Designer):
         self.avg_value_loss = []
         self.avg_policy_loss = []
 
-    def compute_metrics(self,iter_metrics) -> tuple:
+    def compute_metrics(self,iter_metrics) -> dict:
 
         # Evaluate
         if self._render:

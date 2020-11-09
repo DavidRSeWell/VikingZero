@@ -24,8 +24,8 @@ agent_config:
     output_size: 9
     optimizer: Adam
     player: 1
-    minimax_lookup_path: /Users/befeltingu/Documents/Github/VikingZeroDev/tests/minimax_state_actions.npy
-    state_lookup_path: /Users/befeltingu/Documents/Github/VikingZeroDev/tests/state_dict.npy
+    minimax_lookup_path: # For mimimax loss
+    state_lookup_path:
     t_threshold: 2
     weight_decay: 0
 
@@ -48,6 +48,6 @@ exp_config: # experiment config
   eval_threshold: 1
   render: false
   run_evaluator: false
-  run_minimax_eval: false
+  run_minimax_eval: true
   save_model: true
   train_iters: 10 # number of games to play per episode

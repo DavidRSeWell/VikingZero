@@ -793,6 +793,8 @@ class AlphaZero:
 
     @staticmethod
     def load_lookup(path) -> dict:
+        if not path:
+            return {}
 
         if len(path) > 0:
             return np.load(path, allow_pickle=True).item()
