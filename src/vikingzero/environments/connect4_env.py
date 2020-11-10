@@ -10,6 +10,8 @@ class Connect4(gym.Env):
 
         self._display_board = display_board
 
+        self.action_size = 7
+
         self.board = np.zeros((6,7))
 
         self.current_player = 1
@@ -39,6 +41,18 @@ class Connect4(gym.Env):
 
         else:
             return legal_play[-1]
+
+    def next_state(self,board,action):
+
+        curr_state = board.copy()
+
+        board_row = self.process_move(curr_state, action)
+
+        next_state = curr_state.copy()
+
+        next_state[board_row, action] = self.check_turn(board)
+
+        return next_state
 
     def reset(self):
         self.board = np.zeros((6, 7))

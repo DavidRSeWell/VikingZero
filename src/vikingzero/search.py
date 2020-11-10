@@ -516,10 +516,12 @@ class ZeroMCTS:
             node_index = self.dec_pts.index(node)
         except:
             print("oppsssy")
+
+        action_size = self._env.action_size
         value = self._Vs[node]
         counts = self.calculate_NS(node)
         valid_actions = self._env.valid_actions(node.state)
-        blank_board = np.zeros((9,))
+        blank_board = np.zeros((action_size,))
         q_board = blank_board.copy()
         v_board = blank_board.copy()
         n_board = blank_board.copy()
@@ -533,17 +535,17 @@ class ZeroMCTS:
         v_board[child_actions] = child_v
         n_board[valid_actions] = child_n
 
-        prior_p = self._Ps[node].copy().reshape((3,3))
+        prior_p = self._Ps[node].copy()
         print("Vs")
         print(value)
         print("Ns")
         print(counts)
         print("Nsa")
-        print(n_board.reshape((3,3)))
+        print(n_board)
         print("Qsa")
-        print(q_board.reshape((3,3)))
+        print(q_board)
         print("Vsa")
-        print(v_board.reshape((3,3)))
+        print(v_board)
         print("Prior P")
         print(prior_p)
 
