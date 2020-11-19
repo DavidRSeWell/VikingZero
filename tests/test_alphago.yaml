@@ -41,8 +41,8 @@ exp_config: # experiment config
   episodes: 300
   exp_name: alphago_connect4
   logger_type: tensorboard # what source to use for logging experiments.
-  neptune_api_token: {neptune_token}
-  neptune_name: {neptune_username}/sandbox
+  neptune_api_token: neptune_token
+  neptune_name: neptune_username/sandbox
   plot_data: false
   record_all: true
   record_every: 20 # how often to record info

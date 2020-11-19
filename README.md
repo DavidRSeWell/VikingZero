@@ -1,6 +1,6 @@
 # VikingZero
 
-Building AlphaGo Zero from scratch.
+This repository is part of an effort to understand 
  
 
 ### Installation

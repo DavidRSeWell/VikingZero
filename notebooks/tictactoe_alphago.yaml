@@ -36,7 +36,7 @@ agent_config:
 
 
 exp_config: # experiment config
-  episodes: 15 # total number of episodes to run
+  episodes: 5 # total number of episodes to run
   exp_name: alphago
   logger_type: tensorboard # what source to use for logging experiments.
   neptune_api_token: neptune_api_key
