@@ -19,9 +19,10 @@ poetry install
 
 ### Usage
 
-For example of how to run go to notebooks/run_alphago.ipynb and run
+For example of how to train an agent go to notebooks/run_alphago.ipynb and run the cells. 
 
-This project uses yaml files for run configurations. notebooks/ has a few example files to get started
+This project uses yaml files for run configurations. notebooks/ has a few example files to get started. 
+
 
 ### Agents
 
