@@ -1,12 +1,15 @@
 # VikingZero
 
-This repository is part of an effort to understand 
+This repository is an effort to understand the AlphaGo family of algorithms. 
  
 
 ### Installation
-Requires poetry to install currently
-
-https://python-poetry.org/docs/
+ 
+ ```
+ pip install vikingzero
+ 
+ ```
+Or if you are familiar with poetry (https://python-poetry.org/) you can install locally using the following
 
 ```
 git clone https://github.com/befeltingu/VikingZero.git
@@ -16,35 +19,25 @@ poetry install
 
 ### Usage
 
-```
-cd tests
-python test_sacred_file.py
-```
+For example of how to run go to notebooks/run_alphago.ipynb and run
 
-This will kick off a run of a MCTS agent using the configuration that is specified in the 
-tests/connect4.yaml file. The sacred tests make use of the python sacred package for better 
-tracking and reproducibility of tests. This will automatically store certain statistics in a 
-local MongoDB database. Using just a local file store is also possible. It is recommended to 
-use the omniboard front end tool for viewing test output. Or check out the development branch
-for a dash front end. 
+This project uses yaml files for run configurations. notebooks/ has a few example files to get started
 
-https://sacred.readthedocs.io/en/stable/index.html
+### Agents
 
-https://github.com/vivekratnavel/omniboard
+There are a few types of agents that you can experiment with in this project. 
+
+* MiniMax
+* AlphaBeta Pruning
+* AlphaBeta Pruing with depth limited search
+* Monte carlo tree search - UCT
+* AlphaZero - ( Look to notebooks/connect4.yaml for a connect4 configuration)
 
 
-### TODO 
-In development
-1. Improve Dash Front End
-    1. View saved games from sacred experiment included with agent stats of the current board state
-    2. General Cleanup for Dash
+### Play
 
-2. Agents
-    1. Save off agents post run. 
-    2. Allow for creation of "Expert" database from a minimax or other "good" agent
-    3. Implement MCTS + Expert Net
-    
-3.  Manim - Bring in Manim support for helpful visuals 
+Go to https://github.com/befeltingu/VikingDashboard for a dashboard where you can play against some pre trained models
+
 
 
 
