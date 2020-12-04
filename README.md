@@ -40,7 +40,7 @@ There are a few types of agents that you can experiment with in this project.
 Go to https://github.com/befeltingu/VikingDashboard for a dashboard where you can play against some pre trained models
 
 
-
+![Alt text](https://github.com/befeltingu/VikingDashboard/blob/master/public/example_play.png)
 
 
 
