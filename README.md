@@ -7,7 +7,6 @@ This repository is an effort to understand the AlphaGo family of algorithms.
  
  ```
  pip install vikingzero
- 
  ```
 Or if you are familiar with poetry (https://python-poetry.org/) you can install locally using the following
 
