@@ -1,8 +1,7 @@
 import numpy as np
-import gym
 
 
-class Connect4(gym.Env):
+class Connect4:
 
     metadata = {"render.modes": ["human"]}
 

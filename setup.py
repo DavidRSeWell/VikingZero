@@ -11,26 +11,17 @@ package_data = \
 {'': ['*']}
 
 install_requires = \
-['PyYAML>=5.3.1,<6.0.0',
- 'gym>=0.17.2,<0.18.0',
- 'h5py>=2.10.0,<3.0.0',
- 'jupyter>=1.0.0,<2.0.0',
- 'jupyterlab>=2.2.2,<3.0.0',
- 'matplotlib>=3.3.0,<4.0.0',
- 'numpy==1.16.4',
- 'pymongo>=3.11.0,<4.0.0',
- 'python-dotenv>=0.14.0,<0.15.0',
- 'tables>=3.6.1,<4.0.0',
- 'tensorboard>=2.3.0,<3.0.0',
+['PyYAML',
+ 'matplotlib',
+ 'numpy>=1.15.4,<2.0.0',
+ 'tensorboard',
  'tensorboardX>=2.1,<3.0',
- 'tensorflow>=2.3.1,<3.0.0',
- 'torch>=1.6.0,<2.0.0',
- 'torchvision>=0.7.0,<0.8.0',
- 'tqdm>=4.50.2,<5.0.0']
+ 'torch==1.7.1',
+ 'tqdm']
 
 setup_kwargs = {
     'name': 'vikingzero',
-    'version': '0.1.1',
+    'version': '0.1.2',
     'description': '',
     'long_description': None,
     'author': 'David SeWell',
@@ -42,7 +33,7 @@ setup_kwargs = {
     'packages': packages,
     'package_data': package_data,
     'install_requires': install_requires,
-    'python_requires': '>=3.7,<4.0',
+    'python_requires': '>=3.6.2,<4.0.0',
 }
 
 

@@ -1,8 +1,7 @@
-import gym
 import numpy as np
 
 
-class TicTacToe(gym.Env):
+class TicTacToe:
     """
     This class handles all the logic of running a tic tac
     toe game. It expects as input two players which themselves
