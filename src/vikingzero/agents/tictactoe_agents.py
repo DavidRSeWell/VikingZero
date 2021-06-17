@@ -136,6 +136,9 @@ class TicTacToeNode(Node):
     def actions(self):
         return self.env.actions(self.board)
 
+    def __str__(self):
+        return str(self.board.reshape((3,3)))
+
     def __eq__(self, other):
         return np.equal(other.board,self.board).all() and other.player == self.player and other.winner == self.winner
 
@@ -183,9 +186,13 @@ class TicTacToeMCTS(MCTS):
         self._num_sim = n_sim
         self._player = player
 
+        self.root = None
+
     def act(self,board,render=False):
 
         s = TicTacMCTSNode(self._env,board,self._env.current_player,0)
+
+        self._root = s
         # First rum simulations to collect
         # Tree statistics
         for _ in range(self._num_sim):

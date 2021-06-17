@@ -25,6 +25,7 @@ class MCTS:
 
         self.c = c # exploratory parameter
         self.children = dict()
+        self.root = None
 
     def backup(self,path,reward):
         """
@@ -427,8 +428,12 @@ class ZeroNode:
 
     def __eq__(self, other):
         "Nodes must be comparable"
-        return np.equal(other.state,self.state).all() and other.player == self.player and other.winner == self.winner \
-                                        and other.parent_action == self.parent_action
+        if self.parent:
+            return np.equal(other.state,self.state).all() and other.player == self.player and other.winner == self.winner \
+                                        and other.parent_action == self.parent_action and np.equal(other.parent.state,self.parent.state).all()
+        else:
+            return np.equal(other.state,
+                            self.state).all() and other.player == self.player and other.winner == self.winner
 
 
 class ZeroMCTS:

@@ -11,13 +11,14 @@ class TicTacToe:
     """
     metadata = {'render.modes': ['human']}
 
-    def __init__(self,display_board=False):
+    def __init__(self,display_board=False,start_board=np.array([])):
 
         self._display_board = display_board
+        self._start_board = start_board if (len(start_board) > 0) else np.zeros(9,)
 
         self.action_size = 9
         self.current_player = 1
-        self.board = np.zeros(9,)
+        self.board = self._start_board.copy()
         self.name = "TicTacToe"
 
         def run_test():
@@ -84,7 +85,7 @@ class TicTacToe:
         Reset the board
         :return:
         """
-        self.board = np.zeros(9,)
+        self.board = self._start_board.copy()
 
         def run_test():
             board = [[2., 2., 1.],
