@@ -1,6 +1,8 @@
 # VikingZero
 
-This repository is an effort to understand the AlphaGo family of algorithms. 
+This repository is an effort to understand the AlphaGo family of algorithms as part of the fullfillment for a MS thesis. 
+
+Paper Link: [From MDP to AlphaZero](https://pdxscholar.library.pdx.edu/cgi/viewcontent.cgi?article=6939&context=open_access_etds)
  
 
 ### Installation
